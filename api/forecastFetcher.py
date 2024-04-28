@@ -240,7 +240,7 @@ def calculateSurfSize(swellHeight, swellPeriod, swellDirection, beachDirection, 
 
     wrapReductionFactor = 1 - wrapAmount
 
-    low, high = idealSwellDirection.values()
+    low, high = idealSwellDirection
 
     # Adjust the angles to fall within the same 180 degree range
     if high - low > 180:
@@ -282,7 +282,7 @@ def calculateSurfSize(swellHeight, swellPeriod, swellDirection, beachDirection, 
 
 
 def calculateDirectionQuality(swellDirection, idealSwellDirection):
-    low, high = idealSwellDirection.values()
+    low, high = idealSwellDirection
 
     # Adjust the angles to fall within the same 180 degree range
     if high - low > 180:
