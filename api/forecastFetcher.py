@@ -33,16 +33,20 @@ def retrieveForecast():
         # loop through each region in the country
         for region, spots in regions.items():
             # loop through each spot in the region
-            for spot, coordinates in spots.items():
+            for spot, details in spots.items():
                 # get the latitude and longitude of the spot
-                latitude = coordinates['Latitude']
-                longitude = coordinates['Longitude']
+                latitude = details['Latitude']
+                longitude = details['Longitude']
+
+                beachDirection = details['BeachDirection']
+                idealSwellDirection = details['IdealSwellDirection']
+
                 # retrieve the 5 day forecast for the spot
                 forecast = retrieve5DayWeather(latitude, longitude)
                 # format the forecast data
                 formattedForecast = formatForecast(forecast)
                 # insert the formatted forecast data into the database
-                insertForecast(formattedForecast, coordinates['Name'], region, country, forecastDate)
+                insertForecast(formattedForecast, details['Name'], region, country, forecastDate, beachDirection, idealSwellDirection)
     
 
 
@@ -56,7 +60,7 @@ def getLocations():
     return dict(locations)
 
 #function that inserts the forecast data into the database for a specific location
-def insertForecast(forecast, spot, region, country, forecastDate):
+def insertForecast(forecast, spot, region, country, forecastDate, beachDirection, idealSwellDirection):
     #get the current date and time
 
     # Add the formatted forecast data to the WeatherData node in Firebase Realtime Database
@@ -78,7 +82,11 @@ def insertForecast(forecast, spot, region, country, forecastDate):
             'SecondarySwellHeight': hour['secondarySwellHeight'],
             'SecondarySwellPeriod': hour['secondarySwellPeriod'],
             'SecondarySwellDirection': hour['secondarySwellDirection'],
-            'WaveEnergy': jonswap_spectrum(hour['swellHeight'], hour['swellPeriod'])
+            'WaveEnergy': jonswap_spectrum(hour['swellHeight'], hour['swellPeriod']),
+            'RelativeWindDirection': calculateRelativeWindDirection(hour['windDirection'], beachDirection),
+            'SurfMessiness': calculateSurfMessiness(hour['windSpeed'], hour['windDirection'], beachDirection),
+            'SurfSize': calculateSurfSize(hour['swellHeight'], hour['swellPeriod'], hour['swellDirection'], beachDirection, idealSwellDirection),
+            'DirectionQuality': calculateDirectionQuality(hour['swellDirection'], idealSwellDirection)
         })
 
 
@@ -166,3 +174,131 @@ def retrieve5DayWeather(latitude, longitude):
 
 
 
+
+def calculateRelativeWindDirection(windDirection, beachDirection):
+    difference = math.fabs(windDirection - beachDirection)
+
+    normalizedDifference = min(difference, 360 - difference)
+
+    if normalizedDifference < 22.5:
+        return 'Offshore'
+    elif normalizedDifference < 67.5:
+        return 'Cross-off'
+    elif normalizedDifference < 112.5:
+        return 'Cross-shore'
+    elif normalizedDifference < 157.5:
+        return 'Cross-on'
+    else:
+        return 'Onshore'
+    
+def calculateSurfMessiness(windSpeed, windDirection, beachDirection):
+    relativeWindDirection = calculateRelativeWindDirection(windDirection, beachDirection)
+
+    if relativeWindDirection == 'Offshore':
+        if windSpeed < 30:
+            return 'Clean'
+        else:
+            return 'Okay'
+    elif relativeWindDirection == 'Cross-off':
+        if windSpeed < 20:
+            return 'Clean'
+        elif windSpeed < 40:
+            return 'Okay'
+        else:
+            return 'Messy'
+    elif relativeWindDirection == 'Cross-shore':
+        if windSpeed < 10:
+            return 'Clean'
+        elif windSpeed < 20:
+            return 'Okay'
+        else:
+            return 'Messy'
+    elif relativeWindDirection == 'Cross-on':
+        if windSpeed < 5:
+            return 'Clean'
+        elif windSpeed < 15:
+            return 'Okay'
+        else:
+            return 'Messy'
+    else:
+        if windSpeed < 5:
+            return 'Clean'
+        elif windSpeed < 10:
+            return 'Okay'
+        else:
+            return 'Messy'
+    
+
+def calculateSurfSize(swellHeight, swellPeriod, swellDirection, beachDirection, idealSwellDirection):
+    surfSize = 0
+
+    difference = math.fabs(swellDirection - beachDirection)
+
+    normalizedDifference = min(difference, 360 - difference)
+
+    wrapAmount  = normalizedDifference / 360
+
+    wrapReductionFactor = 1 - wrapAmount
+
+    low, high = idealSwellDirection.values()
+
+    # Adjust the angles to fall within the same 180 degree range
+    if high - low > 180:
+        low += 360
+
+    # Calculate the middle angle
+    middle = (low + high) / 2
+
+    # Normalize the middle angle to fall within the 0 to 360 degree range
+    middle %= 360
+
+    # Calculate the standard deviation
+    std_dev = abs(high - low) / 1.5
+
+    # Calculate the value of the Gaussian function
+    directionSize = math.exp(-0.5 * ((swellDirection - middle) / std_dev) ** 2) 
+
+
+    if swellPeriod <= 8:
+        surfSize =  swellHeight * 0.55 * wrapReductionFactor
+    elif swellPeriod < 9:
+        surfSize =  swellHeight * 0.6 * wrapReductionFactor
+    elif swellPeriod < 10:
+        surfSize =  swellHeight * 0.7 * wrapReductionFactor
+    elif swellPeriod < 11:
+        surfSize =  swellHeight * 0.8 * wrapReductionFactor
+    elif swellPeriod < 12:
+        surfSize =  swellHeight * 0.9 * wrapReductionFactor
+    elif swellPeriod < 13:
+        surfSize =  swellHeight * 1 * wrapReductionFactor
+    elif swellPeriod < 14:
+        surfSize =  swellHeight * 1.1 * wrapReductionFactor
+    elif swellPeriod < 15:
+        surfSize = swellHeight * 1.2 * wrapReductionFactor
+    else:
+        surfSize =  swellHeight * 1.3 * wrapReductionFactor
+
+    return surfSize * wrapReductionFactor * directionSize
+
+
+def calculateDirectionQuality(swellDirection, idealSwellDirection):
+    low, high = idealSwellDirection.values()
+
+    # Adjust the angles to fall within the same 180 degree range
+    if high - low > 180:
+        low += 360
+
+    # Calculate the middle angle
+    middle = (low + high) / 2
+
+    # Normalize the middle angle to fall within the 0 to 360 degree range
+    middle %= 360
+
+    # Calculate the standard deviation
+    std_dev = abs(high - low) / 2.5
+
+    # Calculate the value of the Gaussian function
+    directionQuality = math.exp(-0.5 * ((swellDirection - middle) / std_dev) ** 2) 
+
+    return directionQuality
+    
