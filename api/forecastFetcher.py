@@ -191,9 +191,9 @@ def calculateRelativeWindDirection(windDirection, beachDirection):
     else:
         return 'Onshore'
     
-def calculateSurfMessiness(windSpeed, windDirection, beachDirection):
+def calculateSurfMessiness(windSpeedIn, windDirection, beachDirection):
     relativeWindDirection = calculateRelativeWindDirection(windDirection, beachDirection)
-
+    windSpeed = windSpeedIn * 3.6
     if relativeWindDirection == 'Offshore':
         if windSpeed < 30:
             return 'Clean'
