@@ -238,7 +238,7 @@ def calculateSurfSize(swellHeight, swellPeriod, swellDirection, beachDirection, 
 
     wrapAmount  = normalizedDifference / 360
 
-    wrapReductionFactor = 1 - wrapAmount
+    wrapReductionFactor = 1.2 - wrapAmount
 
     low, high = idealSwellDirection
 
