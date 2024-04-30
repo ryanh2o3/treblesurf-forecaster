@@ -185,7 +185,7 @@ def calculateRelativeWindDirection(windDirection, beachDirection):
     elif normalizedDifference < 67.5:
         return 'Cross-off'
     elif normalizedDifference < 112.5:
-        return 'Cross-shore'
+        return 'Cross'
     elif normalizedDifference < 157.5:
         return 'Cross-on'
     else:
