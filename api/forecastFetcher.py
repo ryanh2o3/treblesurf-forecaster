@@ -82,6 +82,7 @@ def insertForecast(forecast, spot, region, country, forecastDate, beachDirection
             'SecondarySwellHeight': hour['secondarySwellHeight'],
             'SecondarySwellPeriod': hour['secondarySwellPeriod'],
             'SecondarySwellDirection': hour['secondarySwellDirection'],
+            'CloudCover': hour['cloudCover'],
             'WaveEnergy': jonswap_spectrum(hour['swellHeight'], hour['swellPeriod']),
             'RelativeWindDirection': calculateRelativeWindDirection(hour['windDirection'], beachDirection),
             'SurfMessiness': calculateSurfMessiness(hour['windSpeed'], hour['windDirection'], beachDirection),
@@ -110,6 +111,8 @@ def formatForecast(forecast):
         pressure = hour['pressure']['sg']
         #get the wind speed
         windSpeed = hour['windSpeed']['sg']
+        #get the cloud cover
+        cloudCover = hour['cloudCover']['sg']
         #get the precipitation
         precipitation = hour['precipitation']['sg']
         #get the wind direction
@@ -137,6 +140,7 @@ def formatForecast(forecast):
         formattedHour['pressure'] = pressure
         formattedHour['windSpeed'] = windSpeed
         formattedHour['precipitation'] = precipitation
+        formattedHour['cloudCover'] = cloudCover
         formattedHour['windDirection'] = windDirection
         formattedHour['waterTemperature'] = waterTemperature
         formattedHour['swellHeight'] = swellHeight
@@ -161,7 +165,7 @@ def retrieve5DayWeather(latitude, longitude):
     params={
       'lat': latitude,
       'lng': longitude,
-      'params': ','.join(['airTemperature', 'humidity', 'pressure', 'windSpeed', 'precipitation', 'windDirection', 'waterTemperature', 'swellHeight', 'swellPeriod', 'swellDirection', 'secondarySwellHeight', 'secondarySwellPeriod', 'secondarySwellDirection']),
+      'params': ','.join(['airTemperature', 'humidity', 'pressure', 'windSpeed', 'precipitation', 'windDirection', 'waterTemperature', 'swellHeight', 'swellPeriod', 'swellDirection', 'secondarySwellHeight', 'secondarySwellPeriod', 'secondarySwellDirection', 'cloudCover']),
       'start': start.to('UTC').timestamp(),  # Convert to UTC timestamp
       'end': end.to('UTC').timestamp()  # Convert to UTC timestamp
     },
