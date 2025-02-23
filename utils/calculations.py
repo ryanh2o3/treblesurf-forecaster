@@ -10,9 +10,9 @@ def calculate_wave_energy(Hs, T, Tp=10, alpha=8.5):
     
     return spectrum
 
-def calculate_surf_size(swell_height, swell_period, beach_direction, ideal_swell_direction):
+def calculate_surf_size(swell_height, swell_period, beach_direction, swell_direction):
     surf_size = 0
-    difference = math.fabs(beach_direction - ideal_swell_direction)
+    difference = math.fabs(swell_direction - beach_direction)
     normalized_difference = min(difference, 360 - difference)
     
     wrap_amount = normalized_difference / 360
