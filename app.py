@@ -14,7 +14,9 @@ def lambda_handler(event, context):
         # Get forecast for each location
         forecastDate = arrow.now().format('YYYY-MM-DD HH:mm:ss')
         for location in locations:
+            print(location)
             parsed_location = parse_location_data(location)
+            print(parsed_location['spot'])
             retrieve_forecast(
                 latitude=parsed_location['latitude'],
                 longitude=parsed_location['longitude'],
