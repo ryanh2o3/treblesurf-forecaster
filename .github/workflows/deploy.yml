@@ -21,6 +21,21 @@ jobs:
         with:
           python-version: 3.12
 
+      - name: Install and package dependencies
+        run: |
+          # Create a temporary directory for packaging
+          mkdir -p package
+          # Install dependencies directly into the package directory
+          pip install -t ./package requests arrow boto3
+          # Copy application files
+          cp app.py package/
+          cp -r services package/
+          cp -r utils package/ || true
+          # Create deployment package
+          cd package
+          zip -r ../function.zip .
+          cd ..
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

@@ -6,7 +6,6 @@ from services.forecast_service import *
 from services.dynamodb_service import *
 
 dynamodb = boto3.resource('dynamodb')
-table_name = os.environ['DYNAMODB_TABLE']
 
 def lambda_handler(event, context):
     try:
