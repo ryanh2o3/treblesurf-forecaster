@@ -32,7 +32,7 @@ def retrieve_forecast(latitude, longitude, beach_direction, ideal_swell_directio
         raise Exception(f"Error fetching data from StormGlass API: {response.status_code} {response.text}")
     
     forecast_data = response.json()
-    formatted_data = format_forecast_data(forecast_data, beach_direction, ideal_swell_direction, country, region, spot)
+    formatted_data = format_forecast_data(forecast_data, beach_direction, ideal_swell_direction)
     for data in formatted_data:
             forecast_date = data['forecastDate']
             sort_key = f"{country}_{region}_{spot}"
