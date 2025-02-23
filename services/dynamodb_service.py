@@ -1,16 +1,28 @@
 import boto3
 from botocore.exceptions import ClientError
 import json
+from decimal import Decimal
 
 dynamodb = boto3.resource('dynamodb')
 table_name = 'SurfSpotForecastData'
 table = dynamodb.Table(table_name)
 
+
+def convert_floats_to_decimal(obj):
+    """Recursively convert float values to Decimal for DynamoDB compatibility"""
+    if isinstance(obj, dict):
+        return {k: convert_floats_to_decimal(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_floats_to_decimal(v) for v in obj]
+    elif isinstance(obj, float):
+        return Decimal(str(obj))
+    return obj
+
 def save_forecast_data(forecast_data, forecast_date, sort_key):
     item = {
         'forecastDate': forecast_date,
         'country_region_spot': sort_key,
-        'data': forecast_data
+        'data': convert_floats_to_decimal(forecast_data)
     }
     
     try:
