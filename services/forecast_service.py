@@ -26,7 +26,6 @@ def retrieve_forecast(latitude, longitude, beach_direction, ideal_swell_directio
     }
     
     response = requests.get(API_URL, params=params, headers=headers)
-    print(response)
     
     if response.status_code != 200:
         raise Exception(f"Error fetching data from StormGlass API: {response.status_code} {response.text}")
@@ -67,6 +66,5 @@ def format_forecast_data(forecast_data, beach_direction, ideal_swell_direction):
             # 'directionQuality': calculateDirectionQuality(hour['swellDirection'], ideal_swell_direction),
         }
         formatted_forecast.append(entry)
-        print(formatted_forecast)
     
     return formatted_forecast
