@@ -68,7 +68,7 @@ def format_forecast_data(forecast_data, beach_direction, ideal_swell_direction):
                 hour.get('swellHeight', {}).get('noaa'),
                 hour.get('swellPeriod', {}).get('noaa')
             ),
-            'relativeWindDirection': calculateRelativeWindDirection(hour['windDirection'], beach_direction),
+            'relativeWindDirection': calculateRelativeWindDirection(hour.get('windDirection', {}).get('sg'), beach_direction),
             'surfMessiness': calculateSurfMessiness(hour.get('windDirection', {}).get('sg'), hour.get('windSpeed', {}).get('sg'), beach_direction),
             'directionQuality': calculateDirectionQuality(hour.get('swellDirection', {}).get('sg'), ideal_swell_direction),
         }
