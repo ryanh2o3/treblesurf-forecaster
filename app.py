@@ -13,8 +13,12 @@ def lambda_handler(event, context):
         locations = get_location_data()
         # Get forecast for each location
         forecastDate = arrow.now().format('YYYY-MM-DD HH:mm:ss')
+        loops = 0
         for location in locations:
             print(location)
+            if loops == 1:
+                break
+            loops += 1
             parsed_location = parse_location_data(location)
             print(parsed_location['spot'])
             retrieve_forecast(
