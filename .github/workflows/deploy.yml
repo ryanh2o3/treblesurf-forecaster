@@ -26,7 +26,7 @@ jobs:
           # Create a temporary directory for packaging
           mkdir -p package
           # Install dependencies directly into the package directory
-          pip install -t ./package requests arrow boto3
+          pip install -t ./package requests arrow boto3 math
           # Copy application files
           cp app.py package/
           cp -r services package/
