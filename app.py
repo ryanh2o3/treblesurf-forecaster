@@ -12,12 +12,8 @@ def lambda_handler(event, context):
         # Get location data first
         locations = get_location_data()
         forecast_data = []
-        loops = 0
         # Get forecast for each location
         for location in locations:
-            if loops == 1:
-                break
-            loops += 1
             parsed_location = parse_location_data(location)
             spot_forecast = retrieve_forecast(
                 latitude=parsed_location['latitude'],

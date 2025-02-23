@@ -68,5 +68,6 @@ def format_forecast_data(forecast_data, beach_direction, ideal_swell_direction, 
             'spot': spot
         }
         formatted_forecast.append(entry)
+        print(formatted_forecast)
     
     return formatted_forecast
