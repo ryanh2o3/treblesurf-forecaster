@@ -26,6 +26,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install boto3 awscli requests arrow
 
+      - name: Package Lambda Function
+        run: |
+          # Create a temporary directory for packaging
+          mkdir -p package
+          # Copy Python files to package directory
+          cp app.py package/
+          cp -r services package/
+          cp -r utils package/ || true
+          # Create zip file from package directory
+          cd package
+          zip -r ../function.zip .
+          cd ..
+
       - name: "Configure AWS Credentials"
         uses: aws-actions/configure-aws-credentials@v4
         with:
