@@ -32,7 +32,11 @@ def retrieve_forecast(latitude, longitude, beach_direction, ideal_swell_directio
     
     forecast_data = response.json()
     formatted_data = format_forecast_data(forecast_data, beach_direction, ideal_swell_direction)
+    loops = 0
     for data in formatted_data:
+            if loops == 1:
+                break
+            loops += 1
             forecast_date = forecastDate
             sort_key = f"{country}_{region}_{spot}"
             save_forecast_data(data, forecast_date, sort_key)
@@ -54,12 +58,12 @@ def format_forecast_data(forecast_data, beach_direction, ideal_swell_direction):
             'swellHeight': hour.get('swellHeight', {}).get('noaa'),
             'swellPeriod': hour.get('swellPeriod', {}).get('noaa'),
             'swellDirection': hour.get('swellDirection', {}).get('noaa'),
-            # 'surfSize': calculate_surf_size(
-            #     swell_height=hour.get('swellHeight', {}).get('noaa'),
-            #     swell_period=hour.get('swellPeriod', {}).get('noaa'),
-            #     beach_direction=beach_direction,
-            #     swell_direction=hour.get('swellDirection', {}).get('noaa')
-            # ),
+            'surfSize': calculate_surf_size(
+                swell_height=hour.get('swellHeight', {}).get('noaa'),
+                swell_period=hour.get('swellPeriod', {}).get('noaa'),
+                beach_direction=beach_direction,
+                swell_direction=hour.get('swellDirection', {}).get('noaa')
+            ),
             # 'waveEnergy': calculate_wave_energy(hour['swellHeight'], hour['swellPeriod']),
             # 'relativeWindDirection': calculateRelativeWindDirection(hour['windDirection'], beach_direction),
             # 'surfMessiness': calculateSurfMessiness(hour['windSpeed'], hour['windDirection'], beach_direction),
