@@ -4,11 +4,12 @@ import arrow
 import json
 from datetime import datetime
 from .dynamodb_service import *
+from utils.calculations import *
 
 API_URL = "https://api.stormglass.io/v2/weather/point"
 API_KEY = os.environ.get('STORMGLASS_API_KEY')
 
-def retrieve_forecast(latitude, longitude):
+def retrieve_forecast(latitude, longitude, beach_direction, ideal_swell_direction, country, region, spot):
     start = arrow.now()
     end = arrow.now().shift(days=+10).ceil('day')
     
@@ -30,11 +31,11 @@ def retrieve_forecast(latitude, longitude):
         raise Exception(f"Error fetching data from StormGlass API: {response.status_code} {response.text}")
     
     forecast_data = response.json()
-    formatted_data = format_forecast_data(forecast_data)
+    formatted_data = format_forecast_data(forecast_data, beach_direction, ideal_swell_direction, country, region, spot)
     
     return formatted_data
 
-def format_forecast_data(forecast_data):
+def format_forecast_data(forecast_data, beach_direction, ideal_swell_direction, country, region, spot):
     formatted_forecast = []
     forecast_date = datetime.utcnow().strftime('%Y-%m-%d')
     
@@ -51,6 +52,19 @@ def format_forecast_data(forecast_data):
             'swellHeight': hour.get('swellHeight', {}).get('noaa'),
             'swellPeriod': hour.get('swellPeriod', {}).get('noaa'),
             'swellDirection': hour.get('swellDirection', {}).get('noaa'),
+            'surfSize': calculate_surf_size(
+                swell_height=hour.get('swellHeight', {}).get('noaa'),
+                swell_period=hour.get('swellPeriod', {}).get('noaa'),
+                beach_direction=beach_direction,
+                ideal_swell_direction=ideal_swell_direction
+            ),
+            'waveEnergy': calculate_wave_energy(hour['swellHeight'], hour['swellPeriod']),
+            'relativeWindDirection': calculateRelativeWindDirection(hour['windDirection'], beach_direction),
+            'surfMessiness': calculateSurfMessiness(hour['windSpeed'], hour['windDirection'], beach_direction),
+            'directionQuality': calculateDirectionQuality(hour['swellDirection'], ideal_swell_direction),
+            'country': country,
+            'region': region,
+            'spot': spot
         }
         formatted_forecast.append(entry)
     
