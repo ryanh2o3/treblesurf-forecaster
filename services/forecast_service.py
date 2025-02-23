@@ -3,7 +3,7 @@ import requests
 import arrow
 import json
 from datetime import datetime
-from .dynamodb_service import save_forecast_to_dynamodb
+from .dynamodb_service import *
 
 API_URL = "https://api.stormglass.io/v2/weather/point"
 API_KEY = os.environ.get('STORMGLASS_API_KEY')
