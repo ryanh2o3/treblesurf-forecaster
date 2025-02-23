@@ -1,0 +1,76 @@
+name: Deploy Lambdas and setup cron
+
+on:
+  push:
+    branches:
+      - lambda-forecaster
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.12
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install boto3 awscli requests arrow
+
+      - name: "Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::759663378274:role/github_actions_oidc
+          aws-region: eu-west-1
+          audience: sts.amazonaws.com
+
+      - name: Deploy Lambda Function
+        run: |
+          # Check if function exists
+          if aws lambda get-function --function-name surf-forecast-updater 2>&1 > /dev/null; then
+            # Update existing function
+            aws lambda update-function-code \
+              --function-name surf-forecast-updater \
+              --zip-file fileb://function.zip
+          else
+            # Create new function
+            aws lambda create-function \
+              --function-name surf-forecast-updater \
+              --runtime python3.12 \
+              --handler app.lambda_handler \
+              --role arn:aws:iam::759663378274:role/LAMBDA_FUNCTIONS \
+              --zip-file fileb://function.zip \
+              --timeout 300 \
+              --environment Variables={STORMGLASS_API_KEY=${{ secrets.STORMGLASS_API_KEY }},FORECAST_TABLE=SurfSpotForecastData,LOCATION_TABLE=LocationData}
+          fi
+
+      - name: Create EventBridge Rule
+        run: |
+          # Create EventBridge rule for 8 AM and 7 PM UTC
+          aws events put-rule \
+            --name surf-forecast-schedule \
+            --schedule-expression "cron(0 8,19 * * ? *)" \
+            --state ENABLED
+
+          # Add permission for EventBridge to invoke Lambda
+          aws lambda add-permission \
+            --function-name surf-forecast-updater \
+            --statement-id EventBridgeInvoke \
+            --action lambda:InvokeFunction \
+            --principal events.amazonaws.com \
+            --source-arn $(aws events describe-rule --name surf-forecast-schedule --query 'Arn' --output text) \
+            --no-cli-pager
+
+          # Create target for the rule
+          aws events put-targets \
+            --rule surf-forecast-schedule \
+            --targets "Id"="1","Arn"="$(aws lambda get-function --function-name surf-forecast-updater --query 'Configuration.FunctionArn' --output text)"
