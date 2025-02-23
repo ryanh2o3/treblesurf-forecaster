@@ -64,10 +64,13 @@ def format_forecast_data(forecast_data, beach_direction, ideal_swell_direction):
                 beach_direction=beach_direction,
                 swell_direction=hour.get('swellDirection', {}).get('noaa')
             ),
-            'waveEnergy': calculate_wave_energy(hour['swellHeight'], hour['swellPeriod']),
-            # 'relativeWindDirection': calculateRelativeWindDirection(hour['windDirection'], beach_direction),
-            # 'surfMessiness': calculateSurfMessiness(hour['windSpeed'], hour['windDirection'], beach_direction),
-            # 'directionQuality': calculateDirectionQuality(hour['swellDirection'], ideal_swell_direction),
+            'waveEnergy': calculate_wave_energy(
+                hour.get('swellHeight', {}).get('noaa'),
+                hour.get('swellPeriod', {}).get('noaa')
+            ),
+            'relativeWindDirection': calculateRelativeWindDirection(hour['windDirection'], beach_direction),
+            'surfMessiness': calculateSurfMessiness(hour.get('windDirection', {}).get('sg'), hour.get('windSpeed', {}).get('sg'), beach_direction),
+            'directionQuality': calculateDirectionQuality(hour.get('swellDirection', {}).get('sg'), ideal_swell_direction),
         }
         formatted_forecast.append(entry)
     
