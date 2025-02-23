@@ -6,8 +6,7 @@ dynamodb = boto3.resource('dynamodb')
 table_name = 'SurfSpotForecastData'
 table = dynamodb.Table(table_name)
 
-def save_forecast_data(forecast_data, forecast_date, country, region, spot):
-    sort_key = f"{country}_{region}_{spot}"
+def save_forecast_data(forecast_data, forecast_date, sort_key):
     item = {
         'forecastDate': forecast_date,
         'country_region_spot': sort_key,
