@@ -33,10 +33,13 @@ def retrieve_forecast(latitude, longitude, beach_direction, ideal_swell_directio
     
     forecast_data = response.json()
     formatted_data = format_forecast_data(forecast_data, beach_direction, ideal_swell_direction, country, region, spot)
-    
-    return formatted_data
+    for data in formatted_data:
+            forecast_date = data['forecastDate']
+            sort_key = f"{country}_{region}_{spot}"
+            save_forecast_data(data, forecast_date, sort_key)
+    return
 
-def format_forecast_data(forecast_data, beach_direction, ideal_swell_direction, country, region, spot):
+def format_forecast_data(forecast_data, beach_direction, ideal_swell_direction):
     formatted_forecast = []
     
     for hour in forecast_data['hours']:
@@ -63,9 +66,6 @@ def format_forecast_data(forecast_data, beach_direction, ideal_swell_direction, 
             # 'relativeWindDirection': calculateRelativeWindDirection(hour['windDirection'], beach_direction),
             # 'surfMessiness': calculateSurfMessiness(hour['windSpeed'], hour['windDirection'], beach_direction),
             # 'directionQuality': calculateDirectionQuality(hour['swellDirection'], ideal_swell_direction),
-            'country': country,
-            'region': region,
-            'spot': spot
         }
         formatted_forecast.append(entry)
         print(formatted_forecast)

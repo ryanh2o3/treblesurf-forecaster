@@ -11,11 +11,10 @@ def lambda_handler(event, context):
     try:
         # Get location data first
         locations = get_location_data()
-        forecast_data = []
         # Get forecast for each location
         for location in locations:
             parsed_location = parse_location_data(location)
-            spot_forecast = retrieve_forecast(
+            retrieve_forecast(
                 latitude=parsed_location['latitude'],
                 longitude=parsed_location['longitude'],
                 beach_direction=parsed_location['beach_direction'],
@@ -24,14 +23,7 @@ def lambda_handler(event, context):
                 region=parsed_location['region'],
                 spot=parsed_location['spot']
             )
-            forecast_data.extend(spot_forecast)
         
-        # Save forecasts to DynamoDB
-        table_name = os.environ['FORECAST_TABLE']
-        for data in forecast_data:
-            forecast_date = data['forecastDate']
-            sort_key = f"{data['country']}_{data['region']}_{data['spot']}"
-            save_forecast_data(data, forecast_date, sort_key)
         
         return {
             'statusCode': 200,
