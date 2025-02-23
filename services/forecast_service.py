@@ -38,11 +38,11 @@ def retrieve_forecast(latitude, longitude, beach_direction, ideal_swell_directio
 
 def format_forecast_data(forecast_data, beach_direction, ideal_swell_direction, country, region, spot):
     formatted_forecast = []
-    forecast_date = datetime.utcnow().strftime('%Y-%m-%d')
     
     for hour in forecast_data['hours']:
         entry = {
-            'forecastDate': forecast_date,
+            'forecastDate': arrow.now().format('YYYY-MM-DD HH:mm:ss'),
+            'dateForecastedFor': arrow.get(hour['time']).format('YYYY-MM-DD HH:mm:ss'),
             'temperature': hour.get('airTemperature', {}).get('sg'),
             'humidity': hour.get('humidity', {}).get('sg'),
             'pressure': hour.get('pressure', {}).get('sg'),
@@ -53,16 +53,16 @@ def format_forecast_data(forecast_data, beach_direction, ideal_swell_direction, 
             'swellHeight': hour.get('swellHeight', {}).get('noaa'),
             'swellPeriod': hour.get('swellPeriod', {}).get('noaa'),
             'swellDirection': hour.get('swellDirection', {}).get('noaa'),
-            'surfSize': calculate_surf_size(
-                swell_height=hour.get('swellHeight', {}).get('noaa'),
-                swell_period=hour.get('swellPeriod', {}).get('noaa'),
-                beach_direction=beach_direction,
-                swell_direction=hour.get('swellDirection', {}).get('noaa')
-            ),
-            'waveEnergy': calculate_wave_energy(hour['swellHeight'], hour['swellPeriod']),
-            'relativeWindDirection': calculateRelativeWindDirection(hour['windDirection'], beach_direction),
-            'surfMessiness': calculateSurfMessiness(hour['windSpeed'], hour['windDirection'], beach_direction),
-            'directionQuality': calculateDirectionQuality(hour['swellDirection'], ideal_swell_direction),
+            # 'surfSize': calculate_surf_size(
+            #     swell_height=hour.get('swellHeight', {}).get('noaa'),
+            #     swell_period=hour.get('swellPeriod', {}).get('noaa'),
+            #     beach_direction=beach_direction,
+            #     swell_direction=hour.get('swellDirection', {}).get('noaa')
+            # ),
+            # 'waveEnergy': calculate_wave_energy(hour['swellHeight'], hour['swellPeriod']),
+            # 'relativeWindDirection': calculateRelativeWindDirection(hour['windDirection'], beach_direction),
+            # 'surfMessiness': calculateSurfMessiness(hour['windSpeed'], hour['windDirection'], beach_direction),
+            # 'directionQuality': calculateDirectionQuality(hour['swellDirection'], ideal_swell_direction),
             'country': country,
             'region': region,
             'spot': spot
