@@ -36,11 +36,16 @@ jobs:
       - name: Deploy Lambda Function
         run: |
           # Check if function exists
-          if aws lambda get-function --function-name surf-forecast-updater 2>&1 > /dev/null; then
+          if aws lambda get-function --function-name surf-forecast-updater 2>/dev/null; then
             # Update existing function
             aws lambda update-function-code \
               --function-name surf-forecast-updater \
               --zip-file fileb://function.zip
+            
+            # Update environment variables
+            aws lambda update-function-configuration \
+              --function-name surf-forecast-updater \
+              --environment "Variables={STORMGLASS_API_KEY=${{ secrets.STORMGLASS_API_KEY }},FORECAST_TABLE=SurfSpotForecastData,LOCATION_TABLE=LocationData}"
           else
             # Create new function
             aws lambda create-function \
@@ -50,7 +55,7 @@ jobs:
               --role arn:aws:iam::759663378274:role/LAMBDA_FUNCTIONS \
               --zip-file fileb://function.zip \
               --timeout 300 \
-              --environment Variables={STORMGLASS_API_KEY=${{ secrets.STORMGLASS_API_KEY }},FORECAST_TABLE=SurfSpotForecastData,LOCATION_TABLE=LocationData}
+              --environment "Variables={STORMGLASS_API_KEY=${{ secrets.STORMGLASS_API_KEY }},FORECAST_TABLE=SurfSpotForecastData,LOCATION_TABLE=LocationData}"
           fi
 
       - name: Create EventBridge Rule
