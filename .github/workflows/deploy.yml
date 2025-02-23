@@ -48,6 +48,20 @@ jobs:
 
       - name: Deploy Lambda Function
         run: |
+          wait_for_function_update() {
+            while true; do
+              STATUS=$(aws lambda get-function --function-name surf-forecast-updater --query 'Configuration.LastUpdateStatus' --output text)
+              if [ "$STATUS" = "Successful" ]; then
+                break
+              elif [ "$STATUS" = "Failed" ]; then
+                echo "Function update failed"
+                exit 1
+              fi
+              echo "Waiting for function update to complete..."
+              sleep 5
+            done
+          }
+
           # Check if function exists
           if aws lambda get-function --function-name surf-forecast-updater 2>/dev/null; then
             # Update existing function
@@ -55,10 +69,16 @@ jobs:
               --function-name surf-forecast-updater \
               --zip-file fileb://function.zip
             
+            # Wait for the code update to complete
+            wait_for_function_update
+
             # Update environment variables
             aws lambda update-function-configuration \
               --function-name surf-forecast-updater \
               --environment "Variables={STORMGLASS_API_KEY=${{ secrets.STORMGLASS_API_KEY }},FORECAST_TABLE=SurfSpotForecastData,LOCATION_TABLE=LocationData}"
+            
+            # Wait for the configuration update to complete
+            wait_for_function_update
           else
             # Create new function
             aws lambda create-function \
@@ -69,6 +89,9 @@ jobs:
               --zip-file fileb://function.zip \
               --timeout 300 \
               --environment "Variables={STORMGLASS_API_KEY=${{ secrets.STORMGLASS_API_KEY }},FORECAST_TABLE=SurfSpotForecastData,LOCATION_TABLE=LocationData}"
+            
+            # Wait for the function creation to complete
+            wait_for_function_update
           fi
 
       - name: Create EventBridge Rule
