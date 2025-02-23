@@ -21,7 +21,7 @@ def convert_floats_to_decimal(obj):
 def save_forecast_data(forecast_data, forecast_date, sort_key):
     item = {
         'forecastDate': forecast_date,
-        'country_region_spot': sort_key,
+        'country_region_spot': f"{sort_key}#{forecast_data['dateForecastedFor']}", # Make unique composite key
         'data': convert_floats_to_decimal(forecast_data)
     }
     

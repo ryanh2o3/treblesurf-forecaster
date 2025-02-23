@@ -12,6 +12,7 @@ def lambda_handler(event, context):
         # Get location data first
         locations = get_location_data()
         # Get forecast for each location
+        forecastDate = arrow.now().format('YYYY-MM-DD HH:mm:ss')
         for location in locations:
             parsed_location = parse_location_data(location)
             retrieve_forecast(
@@ -21,7 +22,8 @@ def lambda_handler(event, context):
                 ideal_swell_direction=parsed_location['ideal_swell_direction'],
                 country=parsed_location['country'],
                 region=parsed_location['region'],
-                spot=parsed_location['spot']
+                spot=parsed_location['spot'],
+                forecastDate=forecastDate
             )
         
         
