@@ -35,7 +35,7 @@ def lambda_handler(event, context):
         for data in forecast_data:
             forecast_date = data['forecastDate']
             sort_key = f"{data['country']}_{data['region']}_{data['spot']}"
-            save_forecast_data(table_name, forecast_date, sort_key, data)
+            save_forecast_data(data, forecast_date, sort_key)
         
         return {
             'statusCode': 200,
