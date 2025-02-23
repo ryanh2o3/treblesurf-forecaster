@@ -9,7 +9,7 @@ from utils.calculations import *
 API_URL = "https://api.stormglass.io/v2/weather/point"
 API_KEY = os.environ.get('STORMGLASS_API_KEY')
 
-def retrieve_forecast(latitude, longitude, beach_direction, ideal_swell_direction, country, region, spot):
+def retrieve_forecast(latitude, longitude, beach_direction, ideal_swell_direction, country, region, spot, forecastDate):
     start = arrow.now()
     end = arrow.now().shift(days=+10).ceil('day')
     
@@ -34,7 +34,7 @@ def retrieve_forecast(latitude, longitude, beach_direction, ideal_swell_directio
     forecast_data = response.json()
     formatted_data = format_forecast_data(forecast_data, beach_direction, ideal_swell_direction)
     for data in formatted_data:
-            forecast_date = data['forecastDate']
+            forecast_date = forecastDate
             sort_key = f"{country}_{region}_{spot}"
             save_forecast_data(data, forecast_date, sort_key)
     return
@@ -44,7 +44,6 @@ def format_forecast_data(forecast_data, beach_direction, ideal_swell_direction):
     
     for hour in forecast_data['hours']:
         entry = {
-            'forecastDate': arrow.now().format('YYYY-MM-DD HH:mm:ss'),
             'dateForecastedFor': arrow.get(hour['time']).format('YYYY-MM-DD HH:mm:ss'),
             'temperature': hour.get('airTemperature', {}).get('sg'),
             'humidity': hour.get('humidity', {}).get('sg'),
