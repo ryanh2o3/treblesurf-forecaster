@@ -2,9 +2,10 @@ import boto3
 from botocore.exceptions import ClientError
 import json
 from decimal import Decimal
+from datetime import datetime
 
 dynamodb = boto3.resource('dynamodb')
-table_name = 'SurfSpotForecastData'
+table_name = 'SpotForecastData'
 table = dynamodb.Table(table_name)
 
 
@@ -32,7 +33,39 @@ def save_forecast_data(forecast_data, forecast_date, sort_key):
     except ClientError as e:
         print(f"Error saving data to DynamoDB: {e.response['Error']['Message']}")
         return False
+
+def save_forecast_data_batch(formatted_data, forecast_date, country, region, spot):
+    """
+    Save all forecast data in a batch.
+    """
+    # Convert forecast_date to epoch timestamp
+    epoch_timestamp = int(datetime.fromisoformat(forecast_date.replace('Z', '+00:00')).timestamp())
+    try: 
+        with table.batch_writer() as batch:
+            for data in formatted_data:
+                # Construct the partition key and sort key
+                spot_id = f"{country}#{region}#{spot}"
+                forecast_timestamp = int(datetime.fromisoformat(data['dateForecastedFor'].replace('Z', '+00:00')).timestamp())
+                generated_at = epoch_timestamp
+                
+                # The sort key is a compound of forecastDate and generatedAt
+                sort_key = f"{forecast_timestamp}#{generated_at}"
+                
+                # Construct the item to be saved
+                item = {
+                    'country_region_spot': spot_id,  # Use the spot_id as partition key
+                    'forecast_timestamp#generated_at': sort_key,  # The compound sort key
+                    'data': convert_floats_to_decimal(data)  # Store the data as a JSON object
+                }
+                # Put item in the batch
+                batch.put_item(Item=item)
+    except Exception as e:
+        print(f"Error saving data to DynamoDB: {e}")          
+                
     
+    print("Batch save successful!")
+    return
+
 
 def get_location_data(table_name='LocationData'):
     """Fetch all surf spot locations from DynamoDB"""

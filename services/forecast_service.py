@@ -32,10 +32,9 @@ def retrieve_forecast(latitude, longitude, beach_direction, ideal_swell_directio
     
     forecast_data = response.json()
     formatted_data = format_forecast_data(forecast_data, beach_direction, ideal_swell_direction)
-    for data in formatted_data:
-            forecast_date = forecastDate
-            sort_key = f"{country}_{region}_{spot}"
-            save_forecast_data(data, forecast_date, sort_key)
+    
+    # Bulk save logic
+    save_forecast_data_batch(formatted_data, forecastDate, country, region, spot)
     return
 
 def format_forecast_data(forecast_data, beach_direction, ideal_swell_direction):
