@@ -55,6 +55,7 @@ def save_forecast_data_batch(formatted_data, forecast_date, country, region, spo
                 item = {
                     'spot_id': spot_id,  # Use the spot_id as partition key
                     'forecast_timestamp#generated_at': sort_key,  # The compound sort key
+                    'generated_at': generated_at,  # Store the generated_at timestamp
                     'data': convert_floats_to_decimal(data)  # Store the data as a JSON object
                 }
                 # Put item in the batch
