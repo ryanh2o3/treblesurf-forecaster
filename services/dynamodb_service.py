@@ -49,12 +49,12 @@ def save_forecast_data_batch(formatted_data, forecast_date, country, region, spo
                 generated_at = epoch_timestamp
                 
                 # The sort key is a compound of forecastDate and generatedAt
-                sort_key = f"{forecast_timestamp}#{generated_at}"
+                sort_key = str(forecast_timestamp)
                 
                 # Construct the item to be saved
                 item = {
                     'spot_id': spot_id,  # Use the spot_id as partition key
-                    'forecast_timestamp#generated_at': sort_key,  # The compound sort key
+                    'forecast_timestamp': sort_key,  # The compound sort key
                     'generated_at': str(generated_at),  # Store the generated_at timestamp
                     'data': convert_floats_to_decimal(data)  # Store the data as a JSON object
                 }
