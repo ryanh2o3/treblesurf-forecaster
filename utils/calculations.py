@@ -19,23 +19,23 @@ def calculate_surf_size(swell_height, swell_period, beach_direction, swell_direc
     wrap_reduction_factor = 1.4 - wrap_amount
 
     if swell_period <= 8:
-        surf_size = swell_height * 0.55 * wrap_reduction_factor
+        surf_size = swell_height * 0.55
     elif swell_period < 9:
-        surf_size = swell_height * 0.6 * wrap_reduction_factor
+        surf_size = swell_height * 0.6
     elif swell_period < 10:
-        surf_size = swell_height * 0.7 * wrap_reduction_factor
+        surf_size = swell_height * 0.7
     elif swell_period < 11:
-        surf_size = swell_height * 0.8 * wrap_reduction_factor
+        surf_size = swell_height * 0.8
     elif swell_period < 12:
-        surf_size = swell_height * 0.9 * wrap_reduction_factor
+        surf_size = swell_height * 0.9
     elif swell_period < 13:
-        surf_size = swell_height * 1 * wrap_reduction_factor
+        surf_size = swell_height * 1
     elif swell_period < 14:
-        surf_size = swell_height * 1.1 * wrap_reduction_factor
+        surf_size = swell_height * 1.1
     elif swell_period < 15:
-        surf_size = swell_height * 1.2 * wrap_reduction_factor
+        surf_size = swell_height * 1.2
     else:
-        surf_size = swell_height * 1.3 * wrap_reduction_factor
+        surf_size = swell_height * 1.3
 
     return surf_size * wrap_reduction_factor
 
@@ -98,7 +98,8 @@ def calculateSurfMessiness(windSpeedIn, windDirection, beachDirection):
             return 'Messy'
         
 def calculateRelativeWindDirection(windDirection, beachDirection):
-    difference = math.fabs(windDirection - beachDirection)
+    adjustedBeachDirection = (beachDirection +180) % 360
+    difference = math.fabs(windDirection - adjustedBeachDirection)
 
     normalizedDifference = min(difference, 360 - difference)
 
