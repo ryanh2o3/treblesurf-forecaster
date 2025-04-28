@@ -60,7 +60,7 @@ def calculateDirectionQuality(swellDirection, idealSwellDirection):
 
     return directionQuality
     
-def calculateSurfMessiness(windSpeedIn, windDirection, beachDirection):
+def calculateSurfMessiness(windDirection, windSpeedIn, beachDirection):
     relativeWindDirection = calculateRelativeWindDirection(windDirection, beachDirection)
     windSpeed = windSpeedIn * 3.6
     if relativeWindDirection == 'Offshore':
