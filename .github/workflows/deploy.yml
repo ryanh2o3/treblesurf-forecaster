@@ -1,0 +1,133 @@
+name: Deploy Lambdas and setup cron
+
+on:
+  push:
+    branches:
+      - lambda-forecaster
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.12
+
+      - name: Install and package dependencies
+        run: |
+          # Create a temporary directory for packaging
+          mkdir -p package
+          # Install dependencies directly into the package directory
+          pip install -t ./package requests arrow boto3
+          # Copy application files
+          cp app.py package/
+          cp -r services package/
+          cp -r utils package/ || true
+          # Create deployment package
+          cd package
+          zip -r ../function.zip .
+          cd ..
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install boto3 awscli requests arrow
+
+      - name: Package Lambda Function
+        run: |
+          # Create a temporary directory for packaging
+          mkdir -p package
+          # Copy Python files to package directory
+          cp app.py package/
+          cp -r services package/
+          cp -r utils package/ || true
+          # Create zip file from package directory
+          cd package
+          zip -r ../function.zip .
+          cd ..
+
+      - name: "Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::759663378274:role/github_actions_oidc
+          aws-region: eu-west-1
+          audience: sts.amazonaws.com
+
+      - name: Deploy Lambda Function
+        run: |
+          wait_for_function_update() {
+            while true; do
+              STATUS=$(aws lambda get-function --function-name surf-forecast-updater --query 'Configuration.LastUpdateStatus' --output text)
+              if [ "$STATUS" = "Successful" ]; then
+                break
+              elif [ "$STATUS" = "Failed" ]; then
+                echo "Function update failed"
+                exit 1
+              fi
+              echo "Waiting for function update to complete..."
+              sleep 5
+            done
+          }
+
+          # Check if function exists
+          if aws lambda get-function --function-name surf-forecast-updater 2>/dev/null; then
+            # Update existing function
+            aws lambda update-function-code \
+              --function-name surf-forecast-updater \
+              --zip-file fileb://function.zip
+            
+            # Wait for the code update to complete
+            wait_for_function_update
+
+            # Update environment variables
+            aws lambda update-function-configuration \
+              --function-name surf-forecast-updater \
+              --environment "Variables={STORMGLASS_API_KEY=${{ secrets.STORMGLASS_API_KEY }},FORECAST_TABLE=SurfSpotForecastData,LOCATION_TABLE=LocationData}"
+            
+            # Wait for the configuration update to complete
+            wait_for_function_update
+          else
+            # Create new function
+            aws lambda create-function \
+              --function-name surf-forecast-updater \
+              --runtime python3.12 \
+              --handler app.lambda_handler \
+              --role arn:aws:iam::759663378274:role/LAMBDA_FUNCTIONS \
+              --zip-file fileb://function.zip \
+              --timeout 300 \
+              --environment "Variables={STORMGLASS_API_KEY=${{ secrets.STORMGLASS_API_KEY }},FORECAST_TABLE=SurfSpotForecastData,LOCATION_TABLE=LocationData}"
+            
+            # Wait for the function creation to complete
+            wait_for_function_update
+          fi
+
+      - name: Create EventBridge Rule
+        run: |
+          # Create EventBridge rule for 8 AM and 7 PM UTC
+          aws events put-rule \
+            --name surf-forecast-schedule \
+            --schedule-expression "cron(0 8,19 * * ? *)" \
+            --state ENABLED
+
+          # Try to add permission for EventBridge to invoke Lambda (ignore if already exists)
+          aws lambda add-permission \
+            --function-name surf-forecast-updater \
+            --statement-id EventBridgeInvoke \
+            --action lambda:InvokeFunction \
+            --principal events.amazonaws.com \
+            --source-arn $(aws events describe-rule --name surf-forecast-schedule --query 'Arn' --output text) || true
+
+          # Create target for the rule
+          LAMBDA_ARN=$(aws lambda get-function --function-name surf-forecast-updater --query 'Configuration.FunctionArn' --output text)
+
+          aws events put-targets \
+            --rule surf-forecast-schedule \
+            --targets "[{\"Id\": \"1\", \"Arn\": \"$LAMBDA_ARN\"}]"
