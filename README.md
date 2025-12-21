@@ -21,7 +21,6 @@ treblesurf-forecaster/
 ├── app.py                      # Main Lambda handler
 ├── requirements.txt            # Python dependencies
 ├── Dockerfile                  # Container configuration
-├── test.py                     # Test utilities and examples
 ├── services/
 │   ├── __init__.py
 │   ├── forecast_service.py     # StormGlass API integration
@@ -215,7 +214,7 @@ Based on wind speed and direction:
 1. **Package the function**
 
    ```bash
-   zip -r function.zip . -x "venv/*" "*.git*" "test.py"
+   zip -r function.zip . -x "venv/*" "*.git*"
    ```
 
 2. **Deploy using AWS CLI**
@@ -250,17 +249,7 @@ aws events put-rule \
 
 ### Running Tests
 
-```bash
-python test.py
-```
-
-### Test Data
-
-The `test.py` file includes:
-
-- StormGlass API integration examples
-- GRIB file processing examples
-- Sample forecast data for Irish surf spots
+Run the main Lambda handler function for testing forecast retrieval and data storage.
 
 ## 📈 Monitoring & Logging
 
