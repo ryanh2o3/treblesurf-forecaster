@@ -269,7 +269,7 @@ Check AWS CloudWatch Logs for:
 
 ### API Key Management
 
-- Store StormGlass API key in AWS Systems Manager Parameter Store
+- Store StormGlass API key in Github actions secrets
 - Use IAM roles for Lambda execution
 - Use least-privilege access policies
 
