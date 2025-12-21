@@ -1,20 +1,19 @@
 # TrebleSurf Forecaster
 
-A serverless AWS Lambda function that fetches surf forecast data from StormGlass API and stores it in DynamoDB for surf spot predictions and analysis.
+Fetches surf forecast data from StormGlass API and stores it in DynamoDB. Runs as an AWS Lambda function.
 
-## 🌊 Overview
+## Overview
 
-The TrebleSurf Forecaster is a Python-based AWS Lambda function designed to automatically collect and process surf forecast data for multiple surf spots. It retrieves weather and oceanographic data from the StormGlass API, performs surf-specific calculations, and stores the processed data in DynamoDB for use by other TrebleSurf applications.
+This service pulls weather and wave data from StormGlass, runs some surf-specific calculations on it, and saves everything to DynamoDB so other parts of TrebleSurf can use it.
 
-## 🏗️ Architecture
+## Architecture
 
-- **Runtime**: Python 3.8+ (AWS Lambda)
-- **Data Source**: StormGlass API
-- **Storage**: AWS DynamoDB
-- **Deployment**: AWS Lambda (serverless)
-- **Containerization**: Docker support available
+- Python 3.8+ running on AWS Lambda
+- Gets data from StormGlass API
+- Stores data in DynamoDB
+- Can also run in Docker
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 treblesurf-forecaster/
@@ -32,13 +31,13 @@ treblesurf-forecaster/
     └── index.html              # Basic HTML template
 ```
 
-## 🚀 Features
+## Features
 
 ### Core Functionality
 
-- **Automated Forecast Collection**: Fetches 10-day surf forecasts for multiple locations
-- **Multi-Parameter Data**: Collects air temperature, humidity, pressure, wind data, water temperature, swell height, period, and direction
-- **Surf-Specific Calculations**:
+- Fetches 10-day surf forecasts for multiple locations
+- Collects air temperature, humidity, pressure, wind data, water temperature, swell height, period, and direction
+- Calculates surf-related metrics:
   - Surf size estimation based on swell height, period, and beach direction
   - Wave energy calculations
   - Wind direction analysis (offshore, onshore, cross-shore)
@@ -47,11 +46,11 @@ treblesurf-forecaster/
 
 ### Data Processing
 
-- **Batch Operations**: Efficiently saves forecast data using DynamoDB batch writes
-- **Data Validation**: Converts float values to Decimal for DynamoDB compatibility
-- **Error Handling**: Comprehensive error handling for API failures and database operations
+- Uses DynamoDB batch writes to save forecast data
+- Converts float values to Decimal for DynamoDB compatibility
+- Handles API failures and database errors
 
-## 🛠️ Installation & Setup
+## Installation & Setup
 
 ### Prerequisites
 
@@ -62,27 +61,27 @@ treblesurf-forecaster/
 
 ### Local Development
 
-1. **Clone the repository**
+1. Clone the repository
 
    ```bash
    git clone <repository-url>
    cd treblesurf-forecaster
    ```
 
-2. **Create virtual environment**
+2. Create virtual environment
 
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-3. **Install dependencies**
+3. Install dependencies
 
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Set environment variables**
+4. Set environment variables
    ```bash
    export STORMGLASS_API_KEY="your-api-key-here"
    export AWS_ACCESS_KEY_ID="your-access-key"
@@ -92,33 +91,33 @@ treblesurf-forecaster/
 
 ### Docker Deployment
 
-1. **Build the container**
+1. Build the container
 
    ```bash
    docker build -t treblesurf-forecaster .
    ```
 
-2. **Run locally**
+2. Run locally
    ```bash
    docker run -p 5000:5000 treblesurf-forecaster
    ```
 
-## 📊 Data Schema
+## Data Schema
 
 ### DynamoDB Tables
 
 #### SpotForecastData Table
 
-- **Partition Key**: `spot_id` (format: `country#region#spot`)
-- **Sort Key**: `forecast_timestamp` (Unix timestamp)
-- **Attributes**:
+- Partition Key: `spot_id` (format: `country#region#spot`)
+- Sort Key: `forecast_timestamp` (Unix timestamp)
+- Attributes:
   - `generated_at`: When the forecast was generated
   - `data`: Complete forecast data object
 
 #### LocationData Table
 
-- **Partition Key**: `country_region_spot` (format: `country/region/spot`)
-- **Attributes**:
+- Partition Key: `country_region_spot` (format: `country/region/spot`)
+- Attributes:
   - `Latitude`, `Longitude`: Geographic coordinates
   - `BeachDirection`: Beach orientation (degrees)
   - `IdealSwellDirection`: Optimal swell direction range
@@ -146,7 +145,7 @@ treblesurf-forecaster/
 }
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -157,7 +156,7 @@ treblesurf-forecaster/
 
 ### StormGlass API Parameters
 
-The service fetches the following weather parameters:
+The service fetches these weather parameters:
 
 - `airTemperature`: Air temperature in Celsius
 - `humidity`: Relative humidity percentage
@@ -170,7 +169,7 @@ The service fetches the following weather parameters:
 - `swellPeriod`: Wave period in seconds
 - `swellDirection`: Swell direction in degrees
 
-## 🧮 Surf Calculations
+## Surf Calculations
 
 ### Surf Size Calculation
 
@@ -193,31 +192,31 @@ Computes wave energy using:
 
 ### Wind Analysis
 
-- **Offshore**: Wind blowing from land to sea (cleanest conditions)
-- **Cross-off**: Wind blowing diagonally offshore
-- **Cross-shore**: Wind blowing parallel to shore
-- **Cross-on**: Wind blowing diagonally onshore
-- **Onshore**: Wind blowing from sea to land (messiest conditions)
+- Offshore: Wind blowing from land to sea (cleanest conditions)
+- Cross-off: Wind blowing diagonally offshore
+- Cross-shore: Wind blowing parallel to shore
+- Cross-on: Wind blowing diagonally onshore
+- Onshore: Wind blowing from sea to land (messiest conditions)
 
 ### Surf Quality Assessment
 
 Based on wind speed and direction:
 
-- **Clean**: Optimal surfing conditions
-- **Okay**: Decent surfing conditions
-- **Messy**: Challenging surfing conditions
+- Clean: Good surfing conditions
+- Okay: Decent surfing conditions
+- Messy: Challenging surfing conditions
 
-## 🚀 Deployment
+## Deployment
 
 ### AWS Lambda Deployment
 
-1. **Package the function**
+1. Package the function
 
    ```bash
    zip -r function.zip . -x "venv/*" "*.git*"
    ```
 
-2. **Deploy using AWS CLI**
+2. Deploy using AWS CLI
 
    ```bash
    aws lambda create-function \
@@ -228,7 +227,7 @@ Based on wind speed and direction:
      --zip-file fileb://function.zip
    ```
 
-3. **Set environment variables**
+3. Set environment variables
    ```bash
    aws lambda update-function-configuration \
      --function-name treblesurf-forecaster \
@@ -245,17 +244,15 @@ aws events put-rule \
   --schedule-expression "rate(6 hours)"
 ```
 
-## 🧪 Testing
+## Testing
 
-### Running Tests
+Run the main Lambda handler function to test forecast retrieval and data storage.
 
-Run the main Lambda handler function for testing forecast retrieval and data storage.
-
-## 📈 Monitoring & Logging
+## Monitoring & Logging
 
 ### CloudWatch Logs
 
-Monitor function execution through AWS CloudWatch Logs:
+Check AWS CloudWatch Logs for:
 
 - API response times
 - DynamoDB operation success/failure
@@ -268,21 +265,21 @@ Monitor function execution through AWS CloudWatch Logs:
 - Error rate
 - DynamoDB write capacity units
 
-## 🔒 Security
+## Security
 
 ### API Key Management
 
 - Store StormGlass API key in AWS Systems Manager Parameter Store
 - Use IAM roles for Lambda execution
-- Implement least-privilege access policies
+- Use least-privilege access policies
 
 ### Data Protection
 
-- All data stored in DynamoDB is encrypted at rest
+- Data stored in DynamoDB is encrypted at rest
 - API communications use HTTPS
 - No sensitive data logged in CloudWatch
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -290,11 +287,11 @@ Monitor function execution through AWS CloudWatch Logs:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📝 License
+## License
 
 This project is part of the TrebleSurf ecosystem. Please refer to the main TrebleSurf repository for licensing information.
 
-## 🆘 Support
+## Support
 
 For support and questions:
 
@@ -302,12 +299,8 @@ For support and questions:
 - Contact the TrebleSurf development team
 - Check the TrebleSurf documentation
 
-## 🔄 Related Projects
+## Related Projects
 
-- **treblesurf-backend**: Main API server and WebSocket services
-- **treblesurf-buoyData**: Buoy data collection and swell prediction service
-- **treblesurf-frontend**: Web application interface
-
----
-
-_Built with ❤️ for the surfing community_
+- treblesurf-backend: Main API server and WebSocket services
+- treblesurf-buoyData: Buoy data collection and swell prediction service
+- treblesurf-frontend: Web application interface
