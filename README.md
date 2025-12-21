@@ -24,11 +24,9 @@ treblesurf-forecaster/
 │   ├── __init__.py
 │   ├── forecast_service.py     # StormGlass API integration
 │   └── dynamodb_service.py     # DynamoDB operations
-├── utils/
-│   ├── __init__.py
-│   └── calculations.py         # Surf-specific calculations
-└── templates/
-    └── index.html              # Basic HTML template
+└── utils/
+    ├── __init__.py
+    └── calculations.py         # Surf-specific calculations
 ```
 
 ## Features
