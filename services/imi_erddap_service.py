@@ -3,7 +3,9 @@ Irish Marine Institute ERDDAP griddap integration for SWAN wave model.
 Dataset: IMI_IRISH_SHELF_SWAN_WAVE (Irish Shelf, lat 49-56, lon -15 to -3).
 Provides wave-only forecast data; wind/met come from StormGlass.
 """
-import requests
+import json
+import urllib.error
+import urllib.request
 import arrow
 from utils.calculations import (
     calculate_surf_size,
@@ -86,16 +88,18 @@ def fetch_imi_forecast(latitude, longitude, beach_direction, ideal_swell_directi
 
     url = _build_griddap_url(time_start_iso, time_end_iso, lat, lon)
     try:
-        r = requests.get(url, timeout=60)
-        r.raise_for_status()
-    except requests.RequestException as e:
-        print(f"IMI ERDDAP request failed: {e}")
+        # Use urllib so the URL is sent as-is; requests.get() encodes [ ] and this server returns 404 for that
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            if resp.status != 200:
+                print(f"IMI ERDDAP request failed: {resp.status} for url: {url[:120]}...")
+                return []
+            data = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        print(f"IMI ERDDAP request failed: {e.code} for url: {url[:120]}...")
         return []
-
-    try:
-        data = r.json()
-    except ValueError as e:
-        print(f"IMI ERDDAP JSON parse failed: {e}")
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        print(f"IMI ERDDAP request failed: {e}")
         return []
 
     rows = _parse_erddap_table(data)
