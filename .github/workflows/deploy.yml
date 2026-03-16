@@ -62,6 +62,15 @@ jobs:
           audience: sts.amazonaws.com
 
       - name: Deploy Lambda Function
+        env:
+          STORMGLASS_API_KEY: ${{ secrets.STORMGLASS_API_KEY }}
+          FORECAST_TABLE: SurfSpotForecastData
+          LOCATION_TABLE: LocationData
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_SERVICE_ID: ${{ secrets.APPLE_SERVICE_ID }}
+          APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
+          APPLE_PRIVATE_KEY: ${{ secrets.APPLE_PRIVATE_KEY }}
+          WEATHERKIT_JWT: ${{ secrets.WEATHERKIT_JWT }}
         run: |
           wait_for_function_update() {
             while true; do
@@ -77,6 +86,18 @@ jobs:
             done
           }
 
+          # Build env JSON so secrets with newlines/quotes/braces don't break the CLI
+          jq -n \
+            --arg STORMGLASS_API_KEY "$STORMGLASS_API_KEY" \
+            --arg FORECAST_TABLE "$FORECAST_TABLE" \
+            --arg LOCATION_TABLE "$LOCATION_TABLE" \
+            --arg APPLE_TEAM_ID "$APPLE_TEAM_ID" \
+            --arg APPLE_SERVICE_ID "$APPLE_SERVICE_ID" \
+            --arg APPLE_KEY_ID "$APPLE_KEY_ID" \
+            --arg APPLE_PRIVATE_KEY "$APPLE_PRIVATE_KEY" \
+            --arg WEATHERKIT_JWT "$WEATHERKIT_JWT" \
+            '{Variables: {STORMGLASS_API_KEY: $STORMGLASS_API_KEY, FORECAST_TABLE: $FORECAST_TABLE, LOCATION_TABLE: $LOCATION_TABLE, APPLE_TEAM_ID: $APPLE_TEAM_ID, APPLE_SERVICE_ID: $APPLE_SERVICE_ID, APPLE_KEY_ID: $APPLE_KEY_ID, APPLE_PRIVATE_KEY: $APPLE_PRIVATE_KEY, WEATHERKIT_JWT: $WEATHERKIT_JWT}}' > env.json
+
           # Check if function exists
           if aws lambda get-function --function-name surf-forecast-updater 2>/dev/null; then
             # Update existing function
@@ -84,18 +105,14 @@ jobs:
               --function-name surf-forecast-updater \
               --zip-file fileb://function.zip
             
-            # Wait for the code update to complete
             wait_for_function_update
 
-            # Update environment variables (WeatherKit optional: set Apple secrets or WEATHERKIT_JWT)
             aws lambda update-function-configuration \
               --function-name surf-forecast-updater \
-              --environment "Variables={STORMGLASS_API_KEY=${{ secrets.STORMGLASS_API_KEY }},FORECAST_TABLE=SurfSpotForecastData,LOCATION_TABLE=LocationData,APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }},APPLE_SERVICE_ID=${{ secrets.APPLE_SERVICE_ID }},APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }},APPLE_PRIVATE_KEY=${{ secrets.APPLE_PRIVATE_KEY }},WEATHERKIT_JWT=${{ secrets.WEATHERKIT_JWT }}}"
+              --environment file://env.json
             
-            # Wait for the configuration update to complete
             wait_for_function_update
           else
-            # Create new function
             aws lambda create-function \
               --function-name surf-forecast-updater \
               --runtime python3.12 \
@@ -103,9 +120,8 @@ jobs:
               --role arn:aws:iam::759663378274:role/LAMBDA_FUNCTIONS \
               --zip-file fileb://function.zip \
               --timeout 300 \
-              --environment "Variables={STORMGLASS_API_KEY=${{ secrets.STORMGLASS_API_KEY }},FORECAST_TABLE=SurfSpotForecastData,LOCATION_TABLE=LocationData,APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }},APPLE_SERVICE_ID=${{ secrets.APPLE_SERVICE_ID }},APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }},APPLE_PRIVATE_KEY=${{ secrets.APPLE_PRIVATE_KEY }},WEATHERKIT_JWT=${{ secrets.WEATHERKIT_JWT }}}"
+              --environment file://env.json
             
-            # Wait for the function creation to complete
             wait_for_function_update
           fi
 
