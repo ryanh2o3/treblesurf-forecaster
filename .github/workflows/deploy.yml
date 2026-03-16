@@ -3,7 +3,7 @@ name: Deploy Lambdas and setup cron
 on:
   push:
     branches:
-      - lambda-forecaster
+      - main
 
 jobs:
   deploy:
