@@ -71,6 +71,11 @@ def _parse_erddap_table(response_json):
     return out
 
 
+# Request at most this many days ahead; dataset coverage is ~15 days and ERDDAP
+# returns 404 "Your query produced no matching results" when time is outside actual_range.
+IMI_MAX_FORECAST_DAYS = 5
+
+
 def fetch_imi_forecast(latitude, longitude, beach_direction, ideal_swell_direction):
     """
     Fetch wave forecast from IMI ERDDAP for one grid point.
@@ -81,8 +86,8 @@ def fetch_imi_forecast(latitude, longitude, beach_direction, ideal_swell_directi
 
     lat, lon = _snap_to_grid(latitude, longitude)
     time_start = arrow.utcnow()
-    # Dataset coverage is typically ~2 weeks; request up to 10 days to stay within it
-    time_end = time_start.shift(days=+10).ceil("hour")
+    # Keep request within dataset's rolling window to avoid 404 (time outside actual_range).
+    time_end = time_start.shift(days=+IMI_MAX_FORECAST_DAYS).ceil("hour")
     time_start_iso = time_start.format("YYYY-MM-DDTHH:mm:ss") + "Z"
     time_end_iso = time_end.format("YYYY-MM-DDTHH:mm:ss") + "Z"
 
@@ -96,7 +101,15 @@ def fetch_imi_forecast(latitude, longitude, beach_direction, ideal_swell_directi
                 return []
             data = json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
-        print(f"IMI ERDDAP request failed: {e.code} for url: {url[:120]}...")
+        body = ""
+        try:
+            body = e.read().decode()[:500]
+        except Exception:
+            pass
+        msg = f"IMI ERDDAP request failed: {e.code} for url: {url[:120]}..."
+        if body:
+            msg += f" {body}"
+        print(msg)
         return []
     except (urllib.error.URLError, OSError, ValueError) as e:
         print(f"IMI ERDDAP request failed: {e}")
