@@ -58,6 +58,16 @@ def save_forecast_data_batch(formatted_data, forecast_date, country, region, spo
                     'data': convert_floats_to_decimal(data),
                 }
                 batch.put_item(Item=item)
+    except ClientError as e:
+        err = e.response.get("Error", {})
+        if err.get("Code") == "ValidationException" and "key element does not match the schema" in (err.get("Message") or ""):
+            print(
+                "Error saving data to DynamoDB: Key does not match table schema. "
+                "The forecast table must have partition key 'spot_id' (String) and sort key 'forecast_timestamp' (String). "
+                "If your table was created with sort key as Number, create a new table with sort key as String and set FORECAST_TABLE."
+            )
+        else:
+            print(f"Error saving data to DynamoDB: {e}")
     except Exception as e:
         print(f"Error saving data to DynamoDB: {e}")
 
@@ -100,13 +110,14 @@ def parse_location_data(location):
     }
 
 
-def migrate_old_forecast_items_to_multi_source(max_items_per_run=100):
+def migrate_old_forecast_items_to_multi_source(max_items_per_run=500):
     """
     Find forecast items in the old format (sort key = timestamp only, no 'source' attribute),
     write them in the new format (sort key = timestamp#stormglass, source = 'stormglass'),
-    then delete the old items. Runs per-invocation with a limit to avoid Lambda timeout.
-    Uses known spot_ids from LocationData so we only Query those partitions.
-    Returns the number of items migrated.
+    then delete the old items. Runs at the start of every invocation with a per-run limit
+    to avoid timeout; with many scheduled runs per day (full + WeatherKit hourly, etc.),
+    a large backlog will clear over time. Uses known spot_ids from LocationData.
+    Returns the number of items migrated this run.
     """
     try:
         locations = get_location_data()

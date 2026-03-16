@@ -13,7 +13,7 @@ The forecaster now writes **multiple sources** per spot and time (StormGlass, IM
 
 ## Table and key schema
 
-- **Table**: Same forecast table (e.g. `SurfSpotForecastData` / `FORECAST_TABLE`).
+- **Table**: Forecast table (env `FORECAST_TABLE`, e.g. `FORECAST_DATA`).
 - **Partition key**: `spot_id` (String), format `country#region#spot`.
 - **Sort key**: `forecast_timestamp` (String), format `{unix_timestamp}#{source}` (e.g. `1705312800#stormglass`, `1705312800#imi_swan`, `1705312800#weatherkit`).
 

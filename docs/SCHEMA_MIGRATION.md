@@ -1,38 +1,45 @@
-# SpotForecastData Schema and Multi-Source Migration
+# Forecast table schema (multi-source)
 
-## New table key schema (multi-source)
+## New table only
 
-To support multiple forecast sources per spot and time, the table uses a composite sort key that includes the source identifier.
+Create a **new** DynamoDB table with the schema below. The forecaster does not run any migration from old data; it only writes to the table named in `FORECAST_TABLE`.
 
-| Key type     | Attribute name        | Type   | Description                                      |
-| ------------ | ---------------------- | ------ | ------------------------------------------------- |
-| Partition key | `spot_id`             | String | Format: `country#region#spot`                     |
-| Sort key      | `forecast_timestamp`  | String | Format: `{unix_timestamp}#{source}` (e.g. `1705312800#stormglass`, `1705312800#imi_swan`) |
+**Key schema:**
 
-**Item attributes:**
-- `spot_id` (partition key)
-- `forecast_timestamp` (sort key)
-- `generated_at` (String): When the forecast was generated (epoch seconds).
-- `source` (String): Source identifier, e.g. `stormglass`, `imi_swan`.
-- `data` (Map): Forecast payload (same shape as before).
+| Key type      | Attribute name       | Type   | Description                                           |
+| ------------- | -------------------- | ------ | ----------------------------------------------------- |
+| Partition key | `spot_id`            | String | `country#region#spot`                                 |
+| Sort key      | `forecast_timestamp` | String | `{unix_timestamp}#{source}` (e.g. `1705312800#stormglass`) |
 
-## Creating a new table
+**Non-key attributes:** `generated_at` (String), `source` (String), `data` (Map).
 
-DynamoDB does not allow changing the key schema of an existing table. For multi-source support you must either create a new table or migrate.
+## Create the table
 
-**Option A – New table**
+**Option 1 – Script (from repo root):**
 
-1. Create a new table with the same partition key name (`spot_id`) and sort key name (`forecast_timestamp`), but ensure all new writes use the composite sort key value `{timestamp}#{source}`.
-2. Set the Lambda environment variable `FORECAST_TABLE` to the new table name.
-3. Run the forecaster; it will populate the new table. Old table can be retired or kept for read-only.
+```bash
+chmod +x scripts/create_forecast_table.sh
+./scripts/create_forecast_table.sh FORECAST_DATA eu-west-1
+```
 
-**Option B – Automatic migration (same table, old format present)**
+Then set Lambda env `FORECAST_TABLE=FORECAST_DATA` (the deploy workflow already uses this) and redeploy.
 
-If your current table already uses `spot_id` (partition) and `forecast_timestamp` (sort key) with plain timestamps (no `#source`):
+**Option 2 – AWS CLI:**
 
-1. Deploy this forecaster; it writes new data in the new format and runs a **migration step at the start of every Lambda run**.
-2. The migration (`migrate_old_forecast_items_to_multi_source`) queries each known spot (from LocationData), finds items that have no `source` attribute and a sort key without `#`, then for each: writes a new item with sort key `{timestamp}#stormglass` and `source='stormglass'`, then deletes the old item. It processes up to 100 such items per run to avoid timeout.
-3. After enough runs (or once all old data is migrated), the migration step no-opts. New data is always written in the new format.
+```bash
+aws dynamodb create-table \
+  --table-name FORECAST_DATA \
+  --attribute-definitions \
+    AttributeName=spot_id,AttributeType=S \
+    AttributeName=forecast_timestamp,AttributeType=S \
+  --key-schema \
+    AttributeName=spot_id,KeyType=HASH \
+    AttributeName=forecast_timestamp,KeyType=RANGE \
+  --billing-mode PAY_PER_REQUEST \
+  --region eu-west-1
+```
+
+**Option 3 – AWS Console:** DynamoDB → Create table → name e.g. `FORECAST_DATA` → partition key `spot_id` (String), sort key `forecast_timestamp` (String).
 
 ## Source identifiers
 

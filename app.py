@@ -5,7 +5,6 @@ import arrow
 from services.forecast_service import retrieve_forecast
 from services.dynamodb_service import (
     get_location_data,
-    migrate_old_forecast_items_to_multi_source,
     parse_location_data,
     save_forecast_data_batch,
 )
@@ -26,9 +25,6 @@ def lambda_handler(event, context):
     run_weatherkit = run_all or "weatherkit" in requested
 
     try:
-        if run_stormglass:
-            migrate_old_forecast_items_to_multi_source(max_items_per_run=100)
-
         locations = get_location_data()
         forecast_date = arrow.now().format('YYYY-MM-DD HH')
         for location in locations:
