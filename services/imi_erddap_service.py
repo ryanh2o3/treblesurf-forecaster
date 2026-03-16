@@ -5,7 +5,6 @@ Provides wave-only forecast data; wind/met come from StormGlass.
 """
 import requests
 import arrow
-from urllib.parse import quote
 from utils.calculations import (
     calculate_surf_size,
     calculate_wave_energy,
@@ -50,11 +49,12 @@ def _build_griddap_url(time_start_iso, time_end_iso, lat, lon):
         "peak_wave_period",
         "mean_wave_direction_from",
     ]
-    # One slice string per variable (same dimensions for all)
+    # One slice string per variable (same dimensions for all).
+    # Do not URL-encode: this ERDDAP server returns 404 when constraints are encoded.
     constraints = ",".join(
         f"{v}{time_slice}{lat_slice}{lon_slice}" for v in vars_
     )
-    url = f"{BASE_URL}.json?{quote(constraints, safe=',')}"
+    url = f"{BASE_URL}.json?{constraints}"
     return url
 
 
