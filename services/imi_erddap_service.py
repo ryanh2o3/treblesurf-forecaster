@@ -31,9 +31,12 @@ def in_imi_bounds(latitude, longitude):
     )
 
 
-def _snap_to_grid(coord, res=IMI_GRID_RES):
-    """Snap coordinate to grid resolution (e.g. 0.025)."""
-    return round(coord / res) * res
+def _snap_to_grid(lat, lon):
+    """Snap (lat, lon) to the dataset grid. Grid starts at IMI_LAT_MIN, IMI_LON_MIN with step 0.025."""
+    lat_snapped = IMI_LAT_MIN + round((lat - IMI_LAT_MIN) / IMI_GRID_RES) * IMI_GRID_RES
+    lon_snapped = IMI_LON_MIN + round((lon - IMI_LON_MIN) / IMI_GRID_RES) * IMI_GRID_RES
+    # Round to 4 decimals for URL to avoid float noise (e.g. 55.175000000000004)
+    return round(lat_snapped, 4), round(lon_snapped, 4)
 
 
 def _build_griddap_url(time_start_iso, time_end_iso, lat, lon):
@@ -74,9 +77,9 @@ def fetch_imi_forecast(latitude, longitude, beach_direction, ideal_swell_directi
     if not in_imi_bounds(latitude, longitude):
         return []
 
-    lat = _snap_to_grid(latitude)
-    lon = _snap_to_grid(longitude)
+    lat, lon = _snap_to_grid(latitude, longitude)
     time_start = arrow.utcnow()
+    # Dataset coverage is typically ~2 weeks; request up to 10 days to stay within it
     time_end = time_start.shift(days=+10).ceil("hour")
     time_start_iso = time_start.format("YYYY-MM-DDTHH:mm:ss") + "Z"
     time_end_iso = time_end.format("YYYY-MM-DDTHH:mm:ss") + "Z"
