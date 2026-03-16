@@ -33,7 +33,10 @@ treblesurf-forecaster/
 
 ### Core Functionality
 
-- Fetches 10-day surf forecasts for multiple locations
+- Fetches 10-day surf forecasts for multiple locations from one or more sources per spot and time
+- **StormGlass**: used for all spots (wind, met, and wave data)
+- **Irish Marine Institute (IMI) SWAN**: wave model via [ERDDAP griddap](https://erddap.marine.ie/erddap/griddap/IMI_IRISH_SHELF_SWAN_WAVE.html), used for spots within the Irish shelf grid (lat 49–56°, lon -15° to -3°); wave-only, same calculations as StormGlass where applicable
+- **Apple WeatherKit**: hourly weather (wind, precipitation, temperature, etc.) for all spots when configured; weather-only, same wind/surf-messiness calculations where applicable
 - Collects air temperature, humidity, pressure, wind data, water temperature, swell height, period, and direction
 - Calculates surf-related metrics:
   - Surf size estimation based on swell height, period, and beach direction
@@ -47,6 +50,27 @@ treblesurf-forecaster/
 - Uses DynamoDB batch writes to save forecast data
 - Converts float values to Decimal for DynamoDB compatibility
 - Handles API failures and database errors
+
+## What’s needed to make it work
+
+### GitHub Secrets (for Lambda deploy)
+
+Configure these in your repo **Settings → Secrets and variables → Actions** (or the environment used by the deploy workflow):
+
+| Secret | Required | Description |
+|--------|----------|-------------|
+| `STORMGLASS_API_KEY` | Yes | StormGlass API key for forecast data. |
+| `APPLE_TEAM_ID` | No (WeatherKit) | Apple Developer Team ID. |
+| `APPLE_SERVICE_ID` | No (WeatherKit) | WeatherKit Service ID (e.g. `com.example.weatherkit`). |
+| `APPLE_KEY_ID` | No (WeatherKit) | Key ID of the WeatherKit-capable Auth Key. |
+| `APPLE_PRIVATE_KEY` | No (WeatherKit) | **Contents of your `.p8` file** (the whole file: the `-----BEGIN PRIVATE KEY-----` / `-----END PRIVATE KEY-----` block). Paste as one line with `\n` where the line breaks are, or paste with real newlines—both work. |
+| `WEATHERKIT_JWT` | No (WeatherKit) | Alternative to the four `APPLE_*` secrets: a pre-generated JWT. Short-lived; for production the app generates JWTs from `APPLE_*` in Lambda. |
+
+If `WEATHERKIT_JWT` is set, it is used. Otherwise, if all four `APPLE_*` secrets are set, the Lambda generates a JWT and fetches WeatherKit (wind, rain) and stores them with `source=weatherkit`. If none are set, WeatherKit is skipped.
+
+**Using your `.p8` file:** Open the file (e.g. `AuthKey_XXXXXXXX.p8`), copy everything from `-----BEGIN PRIVATE KEY-----` through `-----END PRIVATE KEY-----`. For `APPLE_PRIVATE_KEY` you can either paste that block with real newlines, or as a single line with `\n` in place of each line break (e.g. `-----BEGIN PRIVATE KEY-----\nMIGT...\n-----END PRIVATE KEY-----\n`). `APPLE_KEY_ID` is the same as the filename’s ID part (e.g. `XXXXXXXX`).
+
+**Backend:** The API that reads forecast data must support the new multi-source schema. See [docs/BACKEND_README.md](docs/BACKEND_README.md) for what to change.
 
 ## Installation & Setup
 
@@ -104,13 +128,18 @@ treblesurf-forecaster/
 
 ### DynamoDB Tables
 
-#### SpotForecastData Table
+#### SpotForecastData Table (multi-source)
+
+Multiple forecast sources can be stored for the same spot and time (e.g. StormGlass and Irish Marine Institute SWAN).
 
 - Partition Key: `spot_id` (format: `country#region#spot`)
-- Sort Key: `forecast_timestamp` (Unix timestamp)
+- Sort Key: `forecast_timestamp` (format: `{unix_timestamp}#{source}`, e.g. `1705312800#stormglass`, `1705312800#imi_swan`)
 - Attributes:
   - `generated_at`: When the forecast was generated
+  - `source`: Source identifier (e.g. `stormglass`, `imi_swan`)
   - `data`: Complete forecast data object
+
+For migration and table creation, see [docs/SCHEMA_MIGRATION.md](docs/SCHEMA_MIGRATION.md). For how the backend API should read and expose multi-source data, see [docs/BACKEND_README.md](docs/BACKEND_README.md).
 
 #### LocationData Table
 
@@ -148,6 +177,10 @@ treblesurf-forecaster/
 ### Environment Variables
 
 - `STORMGLASS_API_KEY`: Your StormGlass API key
+- `FORECAST_TABLE`: DynamoDB forecast table name (default: `SpotForecastData`). Use this to point to a table with the multi-source sort key schema.
+- **WeatherKit** (optional): use one of:
+  - `WEATHERKIT_JWT`: pre-generated JWT (short-lived; refresh as needed), or
+  - Apple credentials for server-side JWT: `APPLE_TEAM_ID`, `APPLE_SERVICE_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (PEM string; in Lambda use `\n` for newlines). Requires `pyjwt` and `cryptography`.
 - `AWS_ACCESS_KEY_ID`: AWS access key
 - `AWS_SECRET_ACCESS_KEY`: AWS secret key
 - `AWS_DEFAULT_REGION`: AWS region (e.g., us-east-1)
@@ -234,13 +267,15 @@ Based on wind speed and direction:
 
 ### Scheduled Execution
 
-Set up CloudWatch Events to trigger the function on a schedule:
+The deploy workflow creates three EventBridge rules that invoke the same Lambda with different payloads:
 
-```bash
-aws events put-rule \
-  --name treblesurf-forecaster-schedule \
-  --schedule-expression "rate(6 hours)"
-```
+| Rule | Schedule (UTC) | What runs |
+|------|----------------|-----------|
+| `surf-forecast-schedule` | 08:00, 19:00 daily | Full run: migration + StormGlass + IMI (Irish) + WeatherKit |
+| `surf-forecast-imi` | 02:00, 08:00, 14:00, 20:00 daily | IMI SWAN only (every 6h, ~2h after typical model updates for API freshness) |
+| `surf-forecast-weatherkit` | Every hour (:00) | WeatherKit only |
+
+The Lambda accepts an optional `sources` array in the event (e.g. `{"sources": ["weatherkit"]}`) to run only those sources; with no `sources` it runs all.
 
 ## Testing
 

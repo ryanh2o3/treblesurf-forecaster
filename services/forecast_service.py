@@ -33,8 +33,8 @@ def retrieve_forecast(latitude, longitude, beach_direction, ideal_swell_directio
     forecast_data = response.json()
     formatted_data = format_forecast_data(forecast_data, beach_direction, ideal_swell_direction)
     
-    # Bulk save logic
-    save_forecast_data_batch(formatted_data, forecastDate, country, region, spot)
+    # Bulk save logic (source allows multiple sources per spot+time)
+    save_forecast_data_batch(formatted_data, forecastDate, country, region, spot, source='stormglass')
     return
 
 def format_forecast_data(forecast_data, beach_direction, ideal_swell_direction):

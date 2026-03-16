@@ -1,3 +1,4 @@
+import os
 import boto3
 from botocore.exceptions import ClientError
 import json
@@ -5,7 +6,7 @@ from decimal import Decimal
 from datetime import datetime
 
 dynamodb = boto3.resource('dynamodb')
-table_name = 'SpotForecastData'
+table_name = os.environ.get('FORECAST_TABLE', 'SpotForecastData')
 table = dynamodb.Table(table_name)
 
 
@@ -34,36 +35,32 @@ def save_forecast_data(forecast_data, forecast_date, sort_key):
         print(f"Error saving data to DynamoDB: {e.response['Error']['Message']}")
         return False
 
-def save_forecast_data_batch(formatted_data, forecast_date, country, region, spot):
+def save_forecast_data_batch(formatted_data, forecast_date, country, region, spot, source='stormglass'):
     """
-    Save all forecast data in a batch.
+    Save all forecast data in a batch. Supports multiple sources per spot and time
+    via composite sort key forecast_timestamp#source.
     """
     # Convert forecast_date to epoch timestamp
     epoch_timestamp = int(datetime.fromisoformat(forecast_date.replace('Z', '+00:00')).timestamp())
-    try: 
+    try:
         with table.batch_writer() as batch:
             for data in formatted_data:
-                # Construct the partition key and sort key
                 spot_id = f"{country}#{region}#{spot}"
-                forecast_timestamp = int(datetime.fromisoformat(data['dateForecastedFor'].replace('Z', '+00:00')).timestamp())
-                generated_at = epoch_timestamp
-                
-                # The sort key is a compound of forecastDate and generatedAt
-                sort_key = str(forecast_timestamp)
-                
-                # Construct the item to be saved
+                forecast_ts = int(datetime.fromisoformat(data['dateForecastedFor'].replace('Z', '+00:00')).timestamp())
+                # Composite sort key so multiple sources can exist for same spot and time
+                sort_key = f"{forecast_ts}#{source}"
+
                 item = {
-                    'spot_id': spot_id,  # Use the spot_id as partition key
-                    'forecast_timestamp': sort_key,  # The compound sort key
-                    'generated_at': str(generated_at),  # Store the generated_at timestamp
-                    'data': convert_floats_to_decimal(data)  # Store the data as a JSON object
+                    'spot_id': spot_id,
+                    'forecast_timestamp': sort_key,
+                    'generated_at': str(epoch_timestamp),
+                    'source': source,
+                    'data': convert_floats_to_decimal(data),
                 }
-                # Put item in the batch
                 batch.put_item(Item=item)
     except Exception as e:
-        print(f"Error saving data to DynamoDB: {e}")          
-                
-    
+        print(f"Error saving data to DynamoDB: {e}")
+
     print("Batch save successful!")
     return
 
@@ -101,3 +98,100 @@ def parse_location_data(location):
         'longitude': float(location['Longitude']),
         'ideal_swell_direction': ideal_swell
     }
+
+
+def migrate_old_forecast_items_to_multi_source(max_items_per_run=100):
+    """
+    Find forecast items in the old format (sort key = timestamp only, no 'source' attribute),
+    write them in the new format (sort key = timestamp#stormglass, source = 'stormglass'),
+    then delete the old items. Runs per-invocation with a limit to avoid Lambda timeout.
+    Uses known spot_ids from LocationData so we only Query those partitions.
+    Returns the number of items migrated.
+    """
+    try:
+        locations = get_location_data()
+    except Exception as e:
+        print(f"Migration: could not load locations: {e}")
+        return 0
+
+    spot_ids = []
+    for loc in locations:
+        parsed = parse_location_data(loc)
+        spot_ids.append(f"{parsed['country']}#{parsed['region']}#{parsed['spot']}")
+    spot_ids = list(dict.fromkeys(spot_ids))  # dedupe
+
+    migrated = 0
+    for spot_id in spot_ids:
+        if migrated >= max_items_per_run:
+            break
+        try:
+            response = table.query(
+                KeyConditionExpression="spot_id = :sid",
+                ExpressionAttributeValues={":sid": spot_id},
+            )
+        except ClientError as e:
+            print(f"Migration: query failed for {spot_id}: {e}")
+            continue
+
+        for item in response.get("Items", []):
+            if migrated >= max_items_per_run:
+                break
+            sort_key = item.get("forecast_timestamp") or ""
+            if "#" in sort_key or item.get("source") is not None:
+                continue
+            try:
+                new_sort_key = f"{sort_key}#stormglass"
+                new_item = {
+                    "spot_id": item["spot_id"],
+                    "forecast_timestamp": new_sort_key,
+                    "generated_at": item["generated_at"],
+                    "source": "stormglass",
+                    "data": item["data"],
+                }
+                table.put_item(Item=new_item)
+                table.delete_item(
+                    Key={
+                        "spot_id": item["spot_id"],
+                        "forecast_timestamp": sort_key,
+                    }
+                )
+                migrated += 1
+            except ClientError as e:
+                print(f"Migration: put/delete failed for {spot_id} {sort_key}: {e}")
+                continue
+
+        while response.get("LastEvaluatedKey") and migrated < max_items_per_run:
+            response = table.query(
+                KeyConditionExpression="spot_id = :sid",
+                ExpressionAttributeValues={":sid": spot_id},
+                ExclusiveStartKey=response["LastEvaluatedKey"],
+            )
+            for item in response.get("Items", []):
+                if migrated >= max_items_per_run:
+                    break
+                sort_key = item.get("forecast_timestamp") or ""
+                if "#" in sort_key or item.get("source") is not None:
+                    continue
+                try:
+                    new_sort_key = f"{sort_key}#stormglass"
+                    new_item = {
+                        "spot_id": item["spot_id"],
+                        "forecast_timestamp": new_sort_key,
+                        "generated_at": item["generated_at"],
+                        "source": "stormglass",
+                        "data": item["data"],
+                    }
+                    table.put_item(Item=new_item)
+                    table.delete_item(
+                        Key={
+                            "spot_id": item["spot_id"],
+                            "forecast_timestamp": sort_key,
+                        }
+                    )
+                    migrated += 1
+                except ClientError as e:
+                    print(f"Migration: put/delete failed for {spot_id} {sort_key}: {e}")
+
+    if migrated > 0:
+        print(f"Migration: migrated {migrated} old-format items to multi-source format")
+    return migrated
