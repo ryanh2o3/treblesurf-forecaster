@@ -4,6 +4,7 @@ Dataset: IMI_IRISH_SHELF_SWAN_WAVE (Irish Shelf, lat 49-56, lon -15 to -3).
 Provides wave-only forecast data; wind/met come from StormGlass.
 """
 import json
+import math
 import urllib.error
 import urllib.request
 import arrow
@@ -40,12 +41,12 @@ def _snap_to_grid(lat, lon):
     return round(lat_snapped, 4), round(lon_snapped, 4)
 
 
-def _build_griddap_url(time_start_iso, time_end_iso, lat, lon):
-    """Build griddap request for one grid point and time range. Uses .json."""
-    # Subset format: var[(t0):1:(t1)][(lat):1:(lat)][(lon):1:(lon)]
+def _build_griddap_url(time_start_iso, time_end_iso, lat_min, lat_max, lon_min, lon_max):
+    """Build griddap request for a lat/lon box and time range. Uses .json."""
+    # Subset format: var[(t0):1:(t1)][(lat0):1:(lat1)][(lon0):1:(lon1)]
     time_slice = f"[({time_start_iso}):1:({time_end_iso})]"
-    lat_slice = f"[({lat}):1:({lat})]"
-    lon_slice = f"[({lon}):1:({lon})]"
+    lat_slice = f"[({lat_min}):1:({lat_max})]"
+    lon_slice = f"[({lon_min}):1:({lon_max})]"
     vars_ = [
         "significant_wave_height",
         "peak_wave_period",
@@ -71,27 +72,7 @@ def _parse_erddap_table(response_json):
     return out
 
 
-# Request at most this many days ahead; dataset coverage is ~15 days and ERDDAP
-# returns 404 "Your query produced no matching results" when time is outside actual_range.
-IMI_MAX_FORECAST_DAYS = 5
-
-
-def fetch_imi_forecast(latitude, longitude, beach_direction, ideal_swell_direction):
-    """
-    Fetch wave forecast from IMI ERDDAP for one grid point.
-    Returns list of forecast-like dicts (wave fields only; wind/met are None).
-    """
-    if not in_imi_bounds(latitude, longitude):
-        return []
-
-    lat, lon = _snap_to_grid(latitude, longitude)
-    time_start = arrow.utcnow()
-    # Keep request within dataset's rolling window to avoid 404 (time outside actual_range).
-    time_end = time_start.shift(days=+IMI_MAX_FORECAST_DAYS).ceil("hour")
-    time_start_iso = time_start.format("YYYY-MM-DDTHH:mm:ss") + "Z"
-    time_end_iso = time_end.format("YYYY-MM-DDTHH:mm:ss") + "Z"
-
-    url = _build_griddap_url(time_start_iso, time_end_iso, lat, lon)
+def _fetch_erddap_rows(url):
     try:
         # Use urllib so the URL is sent as-is; requests.get() encodes [ ] and this server returns 404 for that
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
@@ -115,7 +96,112 @@ def fetch_imi_forecast(latitude, longitude, beach_direction, ideal_swell_directi
         print(f"IMI ERDDAP request failed: {e}")
         return []
 
-    rows = _parse_erddap_table(data)
+    return _parse_erddap_table(data)
+
+
+def _to_float_or_none(v):
+    if v is None:
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(f):
+        return None
+    return f
+
+
+def _looks_like_land_or_mask(rows):
+    """
+    Heuristic: if the query returns only 0/None for Hs, it's likely a land/masked grid cell.
+    """
+    if not rows:
+        return True
+    any_nonzero = False
+    any_present = False
+    for row in rows:
+        swh_f = _to_float_or_none(row.get("significant_wave_height"))
+        if swh_f is None:
+            continue
+        any_present = True
+        if swh_f > 0:
+            any_nonzero = True
+            break
+    return (not any_present) or (not any_nonzero)
+
+
+def _choose_best_cell(rows, target_lat, target_lon):
+    """
+    Pick the nearest (lat, lon) cell that has non-zero, finite Hs at least once.
+    """
+    candidates = {}
+    for row in rows:
+        lat = _to_float_or_none(row.get("latitude"))
+        lon = _to_float_or_none(row.get("longitude"))
+        if lat is None or lon is None:
+            continue
+        key = (round(lat, 4), round(lon, 4))
+        cand = candidates.get(key)
+        if cand is None:
+            candidates[key] = {"has_nonzero": False}
+            cand = candidates[key]
+        swh_f = _to_float_or_none(row.get("significant_wave_height"))
+        if swh_f is not None and swh_f > 0:
+            cand["has_nonzero"] = True
+
+    best = None
+    best_dist2 = None
+    for (lat, lon), meta in candidates.items():
+        if not meta.get("has_nonzero"):
+            continue
+        dist2 = (lat - target_lat) ** 2 + (lon - target_lon) ** 2
+        if best is None or dist2 < best_dist2:
+            best = (lat, lon)
+            best_dist2 = dist2
+
+    return best
+
+
+# Request at most this many days ahead; dataset coverage is ~15 days and ERDDAP
+# returns 404 "Your query produced no matching results" when time is outside actual_range.
+IMI_MAX_FORECAST_DAYS = 5
+
+
+def fetch_imi_forecast(latitude, longitude, beach_direction, ideal_swell_direction):
+    """
+    Fetch wave forecast from IMI ERDDAP for one grid point.
+    Returns list of forecast-like dicts (wave fields only; wind/met are None).
+    """
+    if not in_imi_bounds(latitude, longitude):
+        return []
+
+    lat, lon = _snap_to_grid(latitude, longitude)
+    time_start = arrow.utcnow()
+    # Keep request within dataset's rolling window to avoid 404 (time outside actual_range).
+    time_end = time_start.shift(days=+IMI_MAX_FORECAST_DAYS).ceil("hour")
+    time_start_iso = time_start.format("YYYY-MM-DDTHH:mm:ss") + "Z"
+    time_end_iso = time_end.format("YYYY-MM-DDTHH:mm:ss") + "Z"
+
+    # First try: exact snapped point. In inlets/nearshore this can land on a masked (land) cell and return 0.
+    url = _build_griddap_url(time_start_iso, time_end_iso, lat, lat, lon, lon)
+    rows = _fetch_erddap_rows(url)
+
+    # Fallback: if it looks like land/mask, query a small surrounding box and pick the nearest wet cell.
+    if _looks_like_land_or_mask(rows):
+        radius_cells = 2  # 2 * 0.025° ~= 5.5 km; small enough to stay nearshore but usually finds ocean
+        lat_min = max(IMI_LAT_MIN, round(lat - radius_cells * IMI_GRID_RES, 4))
+        lat_max = min(IMI_LAT_MAX, round(lat + radius_cells * IMI_GRID_RES, 4))
+        lon_min = max(IMI_LON_MIN, round(lon - radius_cells * IMI_GRID_RES, 4))
+        lon_max = min(IMI_LON_MAX, round(lon + radius_cells * IMI_GRID_RES, 4))
+        url_box = _build_griddap_url(time_start_iso, time_end_iso, lat_min, lat_max, lon_min, lon_max)
+        box_rows = _fetch_erddap_rows(url_box)
+        best = _choose_best_cell(box_rows, latitude, longitude)
+        if best is not None:
+            best_lat, best_lon = best
+            rows = [r for r in box_rows if round(_to_float_or_none(r.get("latitude")) or -999, 4) == best_lat
+                    and round(_to_float_or_none(r.get("longitude")) or -999, 4) == best_lon]
+        # If we couldn't find a better wet cell, keep the original point result (likely 0/masked).
+
     # ERDDAP may return one row per variable per time (long format) or one row per time with all vars
     # Standard griddap returns one row per (time, lat, lon) with all requested variables in columns
     if not rows:
