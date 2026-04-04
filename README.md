@@ -271,7 +271,7 @@ The deploy workflow creates EventBridge rules that invoke the same Lambda with d
 
 | Rule | Schedule (UTC) | What runs |
 |------|----------------|-----------|
-| `surf-forecast-schedule` | 08:00, 19:00 daily | Full run: StormGlass (all spots) + merged `imi_swan+weatherkit` (Irish shelf only; no separate IMI/WK items) |
+| `surf-forecast-schedule` | 08:00, 19:00 daily | StormGlass for **non–in-bounds-Ireland** spots + Ireland outside IMI bounds; **no** StormGlass for Ireland inside IMI bounds (merged `imi_swan+weatherkit` only there) |
 | `surf-forecast-weatherkit` | Every hour (:00) | Same merge path: fetches IMI + WeatherKit in bounds, writes **`imi_swan+weatherkit` only** |
 
 The legacy `surf-forecast-imi` (6-hourly IMI-only) rule is removed on deploy; hourly IMI+WK replaces it.

@@ -15,6 +15,10 @@ from services.weatherkit_service import fetch_weatherkit_forecast
 dynamodb = boto3.resource('dynamodb')
 
 
+def _is_ireland(country):
+    return (country or "").strip().lower() == "ireland"
+
+
 def lambda_handler(event, context):
     # Optional: run only specific sources. Event: { "sources": ["stormglass", "imi_swan", "weatherkit"] } or omit for all.
     requested = event.get("sources")
@@ -33,7 +37,10 @@ def lambda_handler(event, context):
             print(location)
             parsed = parse_location_data(location)
             print(parsed['spot'])
-            if run_stormglass:
+            in_bounds = in_imi_bounds(parsed['latitude'], parsed['longitude'])
+            # Irish shelf spots use merged imi_swan+weatherkit only — skip Stormglass so Dynamo has ~1 row/hour
+            # (not stormglass + merged). Ireland outside IMI bounds still gets Stormglass.
+            if run_stormglass and not (_is_ireland(parsed['country']) and in_bounds):
                 retrieve_forecast(
                     latitude=parsed['latitude'],
                     longitude=parsed['longitude'],
@@ -45,7 +52,7 @@ def lambda_handler(event, context):
                     forecastDate=forecast_date,
                 )
             imi_data = None
-            if run_imi and in_imi_bounds(parsed['latitude'], parsed['longitude']):
+            if run_imi and in_bounds:
                 imi_data = fetch_imi_forecast(
                     latitude=parsed['latitude'],
                     longitude=parsed['longitude'],
@@ -54,7 +61,7 @@ def lambda_handler(event, context):
                 )
             weatherkit_data = None
             # WeatherKit is only fetched in IMI bounds; we persist merged `imi_swan+weatherkit` only (no standalone WK rows).
-            if run_weatherkit and in_imi_bounds(parsed['latitude'], parsed['longitude']):
+            if run_weatherkit and in_bounds:
                 weatherkit_data = fetch_weatherkit_forecast(
                     latitude=parsed['latitude'],
                     longitude=parsed['longitude'],

@@ -13,7 +13,9 @@ from utils.calculations import (
 )
 
 BASE_URL = "https://weatherkit.apple.com/api/v1/weather"
-# Default to 10-day hourly; Apple allows long-lived tokens (e.g. 180 days) for server use
+# Hourly forecast window for REST API (default response without range is ~24h).
+# IMI SWAN uses ~5 days; 6 days covers that with a small buffer for merge alignment.
+WEATHERKIT_HOURLY_FORECAST_DAYS = 6
 JWT_EXPIRATION_SECONDS = 86400 * 7  # 7 days
 
 
@@ -76,11 +78,19 @@ def fetch_weatherkit_forecast(latitude, longitude, beach_direction):
         return []
 
     url = f"{BASE_URL}/en_US/{latitude}/{longitude}"
-    params = {"dataSets": "forecastHourly"}
+    hourly_start = arrow.utcnow().floor("hour")
+    hourly_end = hourly_start.shift(days=+WEATHERKIT_HOURLY_FORECAST_DAYS).ceil("hour")
+    iso_start = hourly_start.format("YYYY-MM-DDTHH:mm:ss") + "Z"
+    iso_end = hourly_end.format("YYYY-MM-DDTHH:mm:ss") + "Z"
+    params = {
+        "dataSets": "forecastHourly",
+        "hourlyStart": iso_start,
+        "hourlyEnd": iso_end,
+    }
     headers = {"Authorization": f"Bearer {jwt_token}"}
 
     try:
-        r = requests.get(url, params=params, headers=headers, timeout=30)
+        r = requests.get(url, params=params, headers=headers, timeout=60)
         r.raise_for_status()
     except requests.RequestException as e:
         print(f"WeatherKit request failed: {e}")
