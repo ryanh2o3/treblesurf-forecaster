@@ -64,7 +64,7 @@ jobs:
       - name: Deploy Lambda Function
         env:
           STORMGLASS_API_KEY: ${{ secrets.STORMGLASS_API_KEY }}
-          FORECAST_TABLE: FORECAST_DATA
+          FORECAST_TABLE: surf_forecasts
           LOCATION_TABLE: LocationData
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_SERVICE_ID: ${{ secrets.APPLE_SERVICE_ID }}

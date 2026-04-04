@@ -79,7 +79,7 @@ If `WEATHERKIT_JWT` is set, it is used. Otherwise, if all four `APPLE_*` secrets
 - Python 3.8+
 - AWS CLI configured
 - StormGlass API key
-- AWS DynamoDB tables: `SpotForecastData` and `LocationData`
+- AWS DynamoDB tables: `surf_forecasts` (or override via `FORECAST_TABLE`) and `LocationData`
 
 ### Local Development
 
@@ -128,15 +128,15 @@ If `WEATHERKIT_JWT` is set, it is used. Otherwise, if all four `APPLE_*` secrets
 
 ### DynamoDB Tables
 
-#### SpotForecastData Table (multi-source)
+#### `surf_forecasts` Table
 
-Multiple forecast sources can be stored for the same spot and time (e.g. StormGlass and Irish Marine Institute SWAN).
+Multiple forecast sources use separate partition keys per source (e.g. StormGlass vs merged Irish shelf).
 
-- Partition Key: `spot_id` (format: `country#region#spot`)
-- Sort Key: `forecast_timestamp` (format: `{unix_timestamp}#{source}`, e.g. `1705312800#stormglass`, `1705312800#imi_swan+weatherkit`)
+- Partition Key: `spot_id` (format: `country#region#spot#source`)
+- Sort Key: `timestamp_ts` (Number, Unix seconds for `dateForecastedFor`)
 - Attributes:
-  - `generated_at`: When the forecast was generated
-  - `source`: Source identifier (written by this Lambda: `stormglass`, `imi_swan+weatherkit` for Irish shelf; legacy rows may still show `imi_swan` / `weatherkit`)
+  - `generated_at`: When the forecast run was generated
+  - `source`: Same identifier as the last segment of `spot_id` (`stormglass`, `imi_swan+weatherkit`, …)
   - `data`: Complete forecast data object
 
 For migration and table creation, see [docs/SCHEMA_MIGRATION.md](docs/SCHEMA_MIGRATION.md). For how the backend API should read and expose multi-source data, see [docs/BACKEND_README.md](docs/BACKEND_README.md).
@@ -177,7 +177,7 @@ For migration and table creation, see [docs/SCHEMA_MIGRATION.md](docs/SCHEMA_MIG
 ### Environment Variables
 
 - `STORMGLASS_API_KEY`: Your StormGlass API key
-- `FORECAST_TABLE`: DynamoDB forecast table name (default: `SpotForecastData`). Use this to point to a table with the multi-source sort key schema.
+- `FORECAST_TABLE`: DynamoDB forecast table name (default: `surf_forecasts`). Table must use `spot_id` (String) and `timestamp_ts` (Number); see [docs/SCHEMA_MIGRATION.md](docs/SCHEMA_MIGRATION.md).
 - **WeatherKit** (optional): use one of:
   - `WEATHERKIT_JWT`: pre-generated JWT (short-lived; refresh as needed), or
   - Apple credentials for server-side JWT: `APPLE_TEAM_ID`, `APPLE_SERVICE_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (PEM string; in Lambda use `\n` for newlines). Requires `pyjwt` and `cryptography`.

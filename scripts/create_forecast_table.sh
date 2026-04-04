@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# Create the forecast DynamoDB table for multi-source schema.
+# Create the surf_forecasts DynamoDB table (PK includes source, numeric SK).
 # Usage: ./scripts/create_forecast_table.sh [TABLE_NAME] [REGION]
-# Defaults: TABLE_NAME=FORECAST_DATA, REGION=eu-west-1
+# Defaults: TABLE_NAME=surf_forecasts, REGION=eu-west-1
 
 set -e
-TABLE_NAME="${1:-FORECAST_DATA}"
+TABLE_NAME="${1:-surf_forecasts}"
 REGION="${2:-eu-west-1}"
 
 aws dynamodb create-table \
   --table-name "$TABLE_NAME" \
   --attribute-definitions \
     AttributeName=spot_id,AttributeType=S \
-    AttributeName=forecast_timestamp,AttributeType=S \
+    AttributeName=timestamp_ts,AttributeType=N \
   --key-schema \
     AttributeName=spot_id,KeyType=HASH \
-    AttributeName=forecast_timestamp,KeyType=RANGE \
+    AttributeName=timestamp_ts,KeyType=RANGE \
   --billing-mode PAY_PER_REQUEST \
   --region "$REGION"
 

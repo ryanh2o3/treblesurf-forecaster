@@ -1,15 +1,15 @@
-# Forecast table schema (multi-source)
+# Forecast table schema (`surf_forecasts`)
 
 ## New table only
 
-Create a **new** DynamoDB table with the schema below. The forecaster does not run any migration from old data; it only writes to the table named in `FORECAST_TABLE`.
+Create a **new** DynamoDB table with the schema below. The forecaster writes to the table named in `FORECAST_TABLE`.
 
 **Key schema:**
 
-| Key type      | Attribute name       | Type   | Description                                           |
-| ------------- | -------------------- | ------ | ----------------------------------------------------- |
-| Partition key | `spot_id`            | String | `country#region#spot`                                 |
-| Sort key      | `forecast_timestamp` | String | `{unix_timestamp}#{source}` (e.g. `1705312800#stormglass`) |
+| Key type      | Attribute name | Type   | Description                                              |
+| ------------- | -------------- | ------ | -------------------------------------------------------- |
+| Partition key | `spot_id`      | String | `country#region#spot#source`                             |
+| Sort key      | `timestamp_ts` | Number | Unix seconds for `dateForecastedFor`                      |
 
 **Non-key attributes:** `generated_at` (String), `source` (String), `data` (Map).
 
@@ -19,29 +19,29 @@ Create a **new** DynamoDB table with the schema below. The forecaster does not r
 
 ```bash
 chmod +x scripts/create_forecast_table.sh
-./scripts/create_forecast_table.sh FORECAST_DATA eu-west-1
+./scripts/create_forecast_table.sh surf_forecasts eu-west-1
 ```
 
-Then set Lambda env `FORECAST_TABLE=FORECAST_DATA` (the deploy workflow already uses this) and redeploy.
+Then set Lambda env `FORECAST_TABLE=surf_forecasts` (the deploy workflow uses this) and redeploy.
 
 **Option 2 – AWS CLI:**
 
 ```bash
 aws dynamodb create-table \
-  --table-name FORECAST_DATA \
+  --table-name surf_forecasts \
   --attribute-definitions \
     AttributeName=spot_id,AttributeType=S \
-    AttributeName=forecast_timestamp,AttributeType=S \
+    AttributeName=timestamp_ts,AttributeType=N \
   --key-schema \
     AttributeName=spot_id,KeyType=HASH \
-    AttributeName=forecast_timestamp,KeyType=RANGE \
+    AttributeName=timestamp_ts,KeyType=RANGE \
   --billing-mode PAY_PER_REQUEST \
   --region eu-west-1
 ```
 
-**Option 3 – AWS Console:** DynamoDB → Create table → name e.g. `FORECAST_DATA` → partition key `spot_id` (String), sort key `forecast_timestamp` (String).
+**Option 3 – AWS Console:** DynamoDB → Create table → name `surf_forecasts` → partition key `spot_id` (String), sort key `timestamp_ts` (Number).
 
 ## Source identifiers
 
-- `stormglass` – StormGlass API (written for all spots on full runs).
-- `imi_swan+weatherkit` – Pre-merged Irish shelf forecast (SWAN swell + WeatherKit weather). The forecaster fetches IMI and WeatherKit only inside SWAN bounds and persists this single merged source (no separate `imi_swan` or `weatherkit` rows from new runs). Legacy items may still exist until TTL.
+- `stormglass` – StormGlass API (written for spots outside Irish IMI shelf logic, and for Ireland outside IMI bounds).
+- `imi_swan+weatherkit` – Pre-merged Irish shelf forecast (SWAN swell + WeatherKit weather), written only when both IMI and WeatherKit runs succeed inside bounds.
