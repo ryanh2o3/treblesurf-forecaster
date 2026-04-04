@@ -9,6 +9,7 @@ from services.dynamodb_service import (
     save_forecast_data_batch,
 )
 from services.imi_erddap_service import fetch_imi_forecast, in_imi_bounds
+from services.merge_ireland_primary import merge_ireland_swan_weatherkit
 from services.weatherkit_service import fetch_weatherkit_forecast
 
 dynamodb = boto3.resource('dynamodb')
@@ -43,6 +44,7 @@ def lambda_handler(event, context):
                     spot=parsed['spot'],
                     forecastDate=forecast_date,
                 )
+            imi_data = None
             if run_imi and in_imi_bounds(parsed['latitude'], parsed['longitude']):
                 imi_data = fetch_imi_forecast(
                     latitude=parsed['latitude'],
@@ -59,6 +61,7 @@ def lambda_handler(event, context):
                         parsed['spot'],
                         source='imi_swan',
                     )
+            weatherkit_data = None
             if run_weatherkit:
                 weatherkit_data = fetch_weatherkit_forecast(
                     latitude=parsed['latitude'],
@@ -73,6 +76,18 @@ def lambda_handler(event, context):
                         parsed['region'],
                         parsed['spot'],
                         source='weatherkit',
+                    )
+            # Pre-merged Ireland primary (same as API compose): swell from SWAN, weather from WeatherKit.
+            if imi_data and weatherkit_data:
+                merged_primary = merge_ireland_swan_weatherkit(imi_data, weatherkit_data)
+                if merged_primary:
+                    save_forecast_data_batch(
+                        merged_primary,
+                        forecast_date,
+                        parsed['country'],
+                        parsed['region'],
+                        parsed['spot'],
+                        source='imi_swan+weatherkit',
                     )
 
         return {

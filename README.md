@@ -267,15 +267,16 @@ Based on wind speed and direction:
 
 ### Scheduled Execution
 
-The deploy workflow creates three EventBridge rules that invoke the same Lambda with different payloads:
+The deploy workflow creates EventBridge rules that invoke the same Lambda with different payloads:
 
 | Rule | Schedule (UTC) | What runs |
 |------|----------------|-----------|
-| `surf-forecast-schedule` | 08:00, 19:00 daily | Full run: migration + StormGlass + IMI (Irish) + WeatherKit |
-| `surf-forecast-imi` | 02:00, 08:00, 14:00, 20:00 daily | IMI SWAN only (every 6h, ~2h after typical model updates for API freshness) |
-| `surf-forecast-weatherkit` | Every hour (:00) | WeatherKit only |
+| `surf-forecast-schedule` | 08:00, 19:00 daily | Full run: migration + StormGlass + IMI (Irish) + WeatherKit (+ merged `imi_swan+weatherkit`) |
+| `surf-forecast-weatherkit` | Every hour (:00) | **IMI SWAN + WeatherKit** in one invocation (Irish shelf spots get waves + Apple weather + pre-merged primary rows) |
 
-The Lambda accepts an optional `sources` array in the event (e.g. `{"sources": ["weatherkit"]}`) to run only those sources; with no `sources` it runs all.
+The legacy `surf-forecast-imi` (6-hourly IMI-only) rule is removed on deploy; hourly IMI+WK replaces it.
+
+The Lambda accepts an optional `sources` array in the event (e.g. `{"sources": ["imi_swan", "weatherkit"]}`) to run only those sources; with no `sources` it runs all.
 
 ## Testing
 

@@ -144,22 +144,7 @@ jobs:
             --rule surf-forecast-schedule \
             --targets "[{\"Id\": \"1\", \"Arn\": \"$LAMBDA_ARN\"}]"
 
-          # IMI SWAN only: every 6 hours at 02, 08, 14, 20 UTC (~2h after typical model updates for API freshness)
-          aws events put-rule \
-            --name surf-forecast-imi \
-            --schedule-expression "cron(0 2,8,14,20 * * ? *)" \
-            --state ENABLED
-          aws lambda add-permission \
-            --function-name surf-forecast-updater \
-            --statement-id EventBridgeInvokeIMI \
-            --action lambda:InvokeFunction \
-            --principal events.amazonaws.com \
-            --source-arn $(aws events describe-rule --name surf-forecast-imi --query 'Arn' --output text) || true
-          aws events put-targets \
-            --rule surf-forecast-imi \
-            --targets "[{\"Id\": \"1\", \"Arn\": \"$LAMBDA_ARN\", \"Input\": \"{\\\"sources\\\":[\\\"imi_swan\\\"]}\"}]"
-
-          # WeatherKit only: every hour
+          # Hourly: IMI SWAN + WeatherKit in one Lambda run (writes imi_swan, weatherkit, imi_swan+weatherkit merge for Irish shelf spots)
           aws events put-rule \
             --name surf-forecast-weatherkit \
             --schedule-expression "cron(0 * * * ? *)" \
@@ -172,4 +157,8 @@ jobs:
             --source-arn $(aws events describe-rule --name surf-forecast-weatherkit --query 'Arn' --output text) || true
           aws events put-targets \
             --rule surf-forecast-weatherkit \
-            --targets "[{\"Id\": \"1\", \"Arn\": \"$LAMBDA_ARN\", \"Input\": \"{\\\"sources\\\":[\\\"weatherkit\\\"]}\"}]"
+            --targets "[{\"Id\": \"1\", \"Arn\": \"$LAMBDA_ARN\", \"Input\": \"{\\\"sources\\\":[\\\"imi_swan\\\",\\\"weatherkit\\\"]}\"}]"
+
+          # Retire legacy 6-hourly IMI-only rule (superseded by hourly IMI+WeatherKit above)
+          aws events remove-targets --rule surf-forecast-imi --ids "1" 2>/dev/null || true
+          aws events delete-rule --name surf-forecast-imi 2>/dev/null || true
