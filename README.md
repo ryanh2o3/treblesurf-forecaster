@@ -66,7 +66,7 @@ Configure these in your repo **Settings → Secrets and variables → Actions** 
 | `APPLE_PRIVATE_KEY` | No (WeatherKit) | **Contents of your `.p8` file** (the whole file: the `-----BEGIN PRIVATE KEY-----` / `-----END PRIVATE KEY-----` block). Paste as one line with `\n` where the line breaks are, or paste with real newlines—both work. |
 | `WEATHERKIT_JWT` | No (WeatherKit) | Alternative to the four `APPLE_*` secrets: a pre-generated JWT. Short-lived; for production the app generates JWTs from `APPLE_*` in Lambda. |
 
-If `WEATHERKIT_JWT` is set, it is used. Otherwise, if all four `APPLE_*` secrets are set, the Lambda generates a JWT and fetches WeatherKit (wind, rain) and stores them with `source=weatherkit`. If none are set, WeatherKit is skipped.
+If `WEATHERKIT_JWT` is set, it is used. Otherwise, if all four `APPLE_*` secrets are set, the Lambda generates a JWT and fetches WeatherKit (wind, rain) **only inside IMI SWAN bounds**, merges with SWAN, and stores **`source=imi_swan+weatherkit`** (no standalone `weatherkit` rows). If none are set, that path is skipped.
 
 **Using your `.p8` file:** Open the file (e.g. `AuthKey_XXXXXXXX.p8`), copy everything from `-----BEGIN PRIVATE KEY-----` through `-----END PRIVATE KEY-----`. For `APPLE_PRIVATE_KEY` you can either paste that block with real newlines, or as a single line with `\n` in place of each line break (e.g. `-----BEGIN PRIVATE KEY-----\nMIGT...\n-----END PRIVATE KEY-----\n`). `APPLE_KEY_ID` is the same as the filename’s ID part (e.g. `XXXXXXXX`).
 
@@ -133,10 +133,10 @@ If `WEATHERKIT_JWT` is set, it is used. Otherwise, if all four `APPLE_*` secrets
 Multiple forecast sources can be stored for the same spot and time (e.g. StormGlass and Irish Marine Institute SWAN).
 
 - Partition Key: `spot_id` (format: `country#region#spot`)
-- Sort Key: `forecast_timestamp` (format: `{unix_timestamp}#{source}`, e.g. `1705312800#stormglass`, `1705312800#imi_swan`)
+- Sort Key: `forecast_timestamp` (format: `{unix_timestamp}#{source}`, e.g. `1705312800#stormglass`, `1705312800#imi_swan+weatherkit`)
 - Attributes:
   - `generated_at`: When the forecast was generated
-  - `source`: Source identifier (e.g. `stormglass`, `imi_swan`)
+  - `source`: Source identifier (written by this Lambda: `stormglass`, `imi_swan+weatherkit` for Irish shelf; legacy rows may still show `imi_swan` / `weatherkit`)
   - `data`: Complete forecast data object
 
 For migration and table creation, see [docs/SCHEMA_MIGRATION.md](docs/SCHEMA_MIGRATION.md). For how the backend API should read and expose multi-source data, see [docs/BACKEND_README.md](docs/BACKEND_README.md).
@@ -271,8 +271,8 @@ The deploy workflow creates EventBridge rules that invoke the same Lambda with d
 
 | Rule | Schedule (UTC) | What runs |
 |------|----------------|-----------|
-| `surf-forecast-schedule` | 08:00, 19:00 daily | Full run: migration + StormGlass + IMI (Irish) + WeatherKit (+ merged `imi_swan+weatherkit`) |
-| `surf-forecast-weatherkit` | Every hour (:00) | **IMI SWAN + WeatherKit** in one invocation (Irish shelf spots get waves + Apple weather + pre-merged primary rows) |
+| `surf-forecast-schedule` | 08:00, 19:00 daily | Full run: StormGlass (all spots) + merged `imi_swan+weatherkit` (Irish shelf only; no separate IMI/WK items) |
+| `surf-forecast-weatherkit` | Every hour (:00) | Same merge path: fetches IMI + WeatherKit in bounds, writes **`imi_swan+weatherkit` only** |
 
 The legacy `surf-forecast-imi` (6-hourly IMI-only) rule is removed on deploy; hourly IMI+WK replaces it.
 

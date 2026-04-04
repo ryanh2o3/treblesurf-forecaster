@@ -52,32 +52,15 @@ def lambda_handler(event, context):
                     beach_direction=parsed['beach_direction'],
                     ideal_swell_direction=parsed['ideal_swell_direction'],
                 )
-                if imi_data:
-                    save_forecast_data_batch(
-                        imi_data,
-                        forecast_date,
-                        parsed['country'],
-                        parsed['region'],
-                        parsed['spot'],
-                        source='imi_swan',
-                    )
             weatherkit_data = None
-            if run_weatherkit:
+            # WeatherKit is only fetched in IMI bounds; we persist merged `imi_swan+weatherkit` only (no standalone WK rows).
+            if run_weatherkit and in_imi_bounds(parsed['latitude'], parsed['longitude']):
                 weatherkit_data = fetch_weatherkit_forecast(
                     latitude=parsed['latitude'],
                     longitude=parsed['longitude'],
                     beach_direction=parsed['beach_direction'],
                 )
-                if weatherkit_data:
-                    save_forecast_data_batch(
-                        weatherkit_data,
-                        forecast_date,
-                        parsed['country'],
-                        parsed['region'],
-                        parsed['spot'],
-                        source='weatherkit',
-                    )
-            # Pre-merged Ireland primary (same as API compose): swell from SWAN, weather from WeatherKit.
+            # Pre-merged Ireland primary: swell from SWAN, weather from WeatherKit (only non-Stormglass source for Irish shelf).
             if imi_data and weatherkit_data:
                 merged_primary = merge_ireland_swan_weatherkit(imi_data, weatherkit_data)
                 if merged_primary:

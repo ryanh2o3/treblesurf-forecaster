@@ -43,6 +43,5 @@ aws dynamodb create-table \
 
 ## Source identifiers
 
-- `stormglass` – StormGlass API (default for all spots).
-- `imi_swan` – Irish Marine Institute SWAN wave model (Irish shelf spots only).
-- `weatherkit` – Apple WeatherKit (weather: wind, precipitation, etc.; all spots when configured).
+- `stormglass` – StormGlass API (written for all spots on full runs).
+- `imi_swan+weatherkit` – Pre-merged Irish shelf forecast (SWAN swell + WeatherKit weather). The forecaster fetches IMI and WeatherKit only inside SWAN bounds and persists this single merged source (no separate `imi_swan` or `weatherkit` rows from new runs). Legacy items may still exist until TTL.

@@ -144,7 +144,7 @@ jobs:
             --rule surf-forecast-schedule \
             --targets "[{\"Id\": \"1\", \"Arn\": \"$LAMBDA_ARN\"}]"
 
-          # Hourly: IMI SWAN + WeatherKit in one Lambda run (writes imi_swan, weatherkit, imi_swan+weatherkit merge for Irish shelf spots)
+          # Hourly: IMI SWAN + WeatherKit in one Lambda run (writes merged imi_swan+weatherkit only for Irish shelf spots; no separate imi_swan/weatherkit rows)
           aws events put-rule \
             --name surf-forecast-weatherkit \
             --schedule-expression "cron(0 * * * ? *)" \
