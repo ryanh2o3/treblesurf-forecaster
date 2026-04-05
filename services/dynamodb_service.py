@@ -13,7 +13,7 @@ GRANULARITY_HOURLY = "hourly"
 GRANULARITY_MULTI_HOUR = "multiHour"
 
 # UTC wall-clock hours written to the sparse multiHour partition (4h cadence).
-MULTI_HOUR_UTC_HOURS = frozenset({0, 4, 8, 12, 16, 20})
+MULTI_HOUR_UTC_HOURS = frozenset({6, 9, 13, 17, 21})
 
 
 def convert_floats_to_decimal(obj):
