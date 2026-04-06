@@ -17,6 +17,8 @@ BASE_URL = "https://weatherkit.apple.com/api/v1/weather"
 # IMI SWAN uses ~5 days; 6 days covers that with a small buffer for merge alignment.
 WEATHERKIT_HOURLY_FORECAST_DAYS = 6
 JWT_EXPIRATION_SECONDS = 86400 * 7  # 7 days
+# REST forecastHourly windSpeed is km/h; StormGlass and calculateSurfMessiness use m/s.
+_KMH_TO_MS = 1.0 / 3.6
 
 
 def _get_jwt():
@@ -126,13 +128,15 @@ def fetch_weatherkit_forecast(latitude, longitude, beach_direction):
         temp = h.get("temperature")
         humidity = h.get("humidity")
         pressure = h.get("pressure")
-        wind_speed = h.get("windSpeed")
+        wind_speed_raw = h.get("windSpeed")
+        wind_speed = (
+            float(wind_speed_raw) * _KMH_TO_MS if wind_speed_raw is not None else None
+        )
         wind_dir = h.get("windDirection")
         precip = h.get("precipitationAmount") or h.get("precipitation") or 0.0
         if precip is None:
             precip = 0.0
 
-        # WeatherKit uses SI: wind in m/s, temp Celsius, pressure hPa, precipitation mm
         relative_wind = None
         surf_messiness = None
         if wind_dir is not None and beach_direction is not None:
@@ -145,7 +149,7 @@ def fetch_weatherkit_forecast(latitude, longitude, beach_direction):
             "temperature": float(temp) if temp is not None else None,
             "humidity": float(humidity) if humidity is not None else None,
             "pressure": float(pressure) if pressure is not None else None,
-            "windSpeed": float(wind_speed) if wind_speed is not None else None,
+            "windSpeed": wind_speed,
             "precipitation": float(precip) if precip is not None else None,
             "windDirection": float(wind_dir) if wind_dir is not None else None,
             "waterTemperature": None,
